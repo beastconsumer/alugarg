@@ -1,66 +1,116 @@
-param(
+﻿param(
   [string]$SupabaseUrl = $env:SUPABASE_URL,
   [string]$SupabaseAnonKey = $env:SUPABASE_ANON_KEY,
   [string]$SupabaseBucket = $env:SUPABASE_BUCKET,
-  [string]$MapsApiKey = $env:MAPS_API_KEY
+  [int]$Port = 5173
 )
 
-function Get-LocalPropertyValue([string]$Key) {
-  $localPropsPath = Join-Path $PSScriptRoot "android\local.properties"
-  if (-not (Test-Path $localPropsPath)) { return $null }
-  $line = Get-Content $localPropsPath | Where-Object { $_ -match "^$Key=" } | Select-Object -First 1
-  if (-not $line) { return $null }
-  return ($line -replace "^$Key=", "").Trim()
+function Get-DotEnvValue([string]$Key) {
+  $envPath = Join-Path $PSScriptRoot '.env'
+  if (-not (Test-Path $envPath)) {
+    return $null
+  }
+
+  foreach ($line in Get-Content $envPath) {
+    $trimmed = $line.Trim()
+    if ([string]::IsNullOrWhiteSpace($trimmed) -or $trimmed.StartsWith('#')) {
+      continue
+    }
+
+    if ($trimmed -match "^$Key=(.*)$") {
+      $value = $matches[1].Trim()
+      if (($value.StartsWith('"') -and $value.EndsWith('"')) -or ($value.StartsWith("'") -and $value.EndsWith("'"))) {
+        return $value.Substring(1, $value.Length - 2)
+      }
+      return $value
+    }
+  }
+
+  return $null
+}
+
+function Stop-PortProcess([int]$TargetPort) {
+  $matches = netstat -ano | Select-String ":$TargetPort\\s+.*LISTENING\\s+(\\d+)$"
+  $pids = @()
+
+  foreach ($m in $matches) {
+    if ($m.Matches.Count -gt 0) {
+      $pids += [int]$m.Matches[0].Groups[1].Value
+    }
+  }
+
+  $pids = $pids | Select-Object -Unique
+
+  foreach ($pidValue in $pids) {
+    if ($pidValue -eq $PID) {
+      continue
+    }
+
+    try {
+      Stop-Process -Id $pidValue -Force -ErrorAction Stop
+      Write-Host "Encerrado processo PID $pidValue na porta $TargetPort." -ForegroundColor Yellow
+    } catch {
+      Write-Host "Nao foi possivel encerrar PID $pidValue (porta $TargetPort)." -ForegroundColor DarkYellow
+    }
+  }
 }
 
 if ([string]::IsNullOrWhiteSpace($SupabaseUrl)) {
-  $SupabaseUrl = Get-LocalPropertyValue "SUPABASE_URL"
+  $SupabaseUrl = $env:VITE_SUPABASE_URL
+}
+if ([string]::IsNullOrWhiteSpace($SupabaseUrl)) {
+  $SupabaseUrl = Get-DotEnvValue 'VITE_SUPABASE_URL'
+}
+
+if ([string]::IsNullOrWhiteSpace($SupabaseAnonKey)) {
+  $SupabaseAnonKey = $env:VITE_SUPABASE_ANON_KEY
 }
 if ([string]::IsNullOrWhiteSpace($SupabaseAnonKey)) {
-  $SupabaseAnonKey = Get-LocalPropertyValue "SUPABASE_ANON_KEY"
+  $SupabaseAnonKey = Get-DotEnvValue 'VITE_SUPABASE_ANON_KEY'
+}
+
+if ([string]::IsNullOrWhiteSpace($SupabaseBucket)) {
+  $SupabaseBucket = $env:VITE_SUPABASE_BUCKET
 }
 if ([string]::IsNullOrWhiteSpace($SupabaseBucket)) {
-  $SupabaseBucket = Get-LocalPropertyValue "SUPABASE_BUCKET"
-}
-if ([string]::IsNullOrWhiteSpace($MapsApiKey)) {
-  $MapsApiKey = Get-LocalPropertyValue "MAPS_API_KEY"
+  $SupabaseBucket = Get-DotEnvValue 'VITE_SUPABASE_BUCKET'
 }
 
 if ([string]::IsNullOrWhiteSpace($SupabaseUrl)) {
-  Write-Host "SUPABASE_URL nao definido. Exemplo:" -ForegroundColor Yellow
-  Write-Host "  .\\run_web.ps1 -SupabaseUrl https://xxxx.supabase.co -SupabaseAnonKey <anon>" -ForegroundColor Yellow
+  Write-Host 'SUPABASE_URL nao definido. Configure .env (VITE_SUPABASE_URL).' -ForegroundColor Yellow
   exit 1
 }
-
 if ([string]::IsNullOrWhiteSpace($SupabaseAnonKey)) {
-  Write-Host "SUPABASE_ANON_KEY nao definido." -ForegroundColor Yellow
+  Write-Host 'SUPABASE_ANON_KEY nao definido. Configure .env (VITE_SUPABASE_ANON_KEY).' -ForegroundColor Yellow
   exit 1
 }
-
 if ([string]::IsNullOrWhiteSpace($SupabaseBucket)) {
-  $SupabaseBucket = "property-images"
+  $SupabaseBucket = 'property-images'
 }
 
-$invalidUrl = $SupabaseUrl.Contains("...") -or $SupabaseUrl.Contains("YOUR_")
-$invalidAnon = $SupabaseAnonKey.Contains("...") -or $SupabaseAnonKey.Contains("YOUR_")
+$invalidUrl = $SupabaseUrl.Contains('...') -or $SupabaseUrl.Contains('YOUR_')
+$invalidAnon = $SupabaseAnonKey.Contains('...') -or $SupabaseAnonKey.Contains('YOUR_')
 if ($invalidUrl -or $invalidAnon) {
-  Write-Host "As chaves Supabase estao com placeholders (ex: ... ou YOUR_)." -ForegroundColor Red
-  Write-Host "Ajuste android/local.properties ou passe -SupabaseUrl/-SupabaseAnonKey reais." -ForegroundColor Yellow
+  Write-Host 'As chaves Supabase estao com placeholders.' -ForegroundColor Red
   exit 1
 }
 
-$dartDefines = @(
-  "--dart-define=SUPABASE_URL=$SupabaseUrl",
-  "--dart-define=SUPABASE_ANON_KEY=$SupabaseAnonKey",
-  "--dart-define=SUPABASE_BUCKET=$SupabaseBucket"
-)
+Stop-PortProcess -TargetPort $Port
 
-if (-not [string]::IsNullOrWhiteSpace($MapsApiKey) -and -not $MapsApiKey.Contains("YOUR_")) {
-  $dartDefines += "--dart-define=MAPS_API_KEY=$MapsApiKey"
-}
+$cmd = @(
+  "cd /d $PSScriptRoot",
+  ('set "VITE_SUPABASE_URL={0}"' -f $SupabaseUrl),
+  ('set "VITE_SUPABASE_ANON_KEY={0}"' -f $SupabaseAnonKey),
+  ('set "VITE_SUPABASE_BUCKET={0}"' -f $SupabaseBucket),
+  'if not exist node_modules npm install',
+  "npm run dev -- --host 127.0.0.1 --port $Port --strictPort"
+) -join ' && '
 
-$cmd = "flutter run -d chrome --no-dds " + ($dartDefines -join ' ')
+Write-Host 'Subindo app React local...' -ForegroundColor Cyan
+Start-Process -FilePath 'cmd.exe' -ArgumentList '/k', $cmd
 
-Write-Host "Executando: $cmd" -ForegroundColor Cyan
+Start-Sleep -Seconds 2
+$localUrl = "http://127.0.0.1:$Port"
+Start-Process $localUrl
 
-Start-Process -FilePath "cmd.exe" -ArgumentList "/k", "cd /d $PSScriptRoot && $cmd"
+Write-Host "App local: $localUrl" -ForegroundColor Green

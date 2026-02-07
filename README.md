@@ -1,182 +1,64 @@
-﻿# Aluga Aluga (Flutter + Supabase)
+# Aluga Aluga (React + Supabase)
 
-MVP Android/Web do marketplace local de aluguel para Balneario Cassino / Rio Grande - RS.
+Aplicacao web React para marketplace de aluguel local no Cassino.
 
 ## Stack
-- Flutter (stable)
-- Supabase Auth (email/senha)
-- Supabase Database (Postgres)
-- Supabase Storage (upload de fotos)
-- Riverpod
-- go_router
-- image_picker + flutter_image_compress
-- google_maps_flutter
-- Material 3
+- React 18 + TypeScript + Vite
+- Supabase: Auth, Postgres, Storage, Realtime
+- Upload de imagens com compressao (`browser-image-compression`)
 
-## Funcionalidades MVP
-- Tela inicial com `background.png` + acoes `Criar conta` e `Ja tenho conta`
-- Cadastro com telefone, nome, CPF, email, data de nascimento e senha forte
-- Login com telefone **ou** email + senha
-- Home com feed de anuncios aprovados + filtros + paginacao
-- Detalhe do imovel com galeria e fluxo de reserva/aluguel
-- Reserva com calculo de taxas:
-  - inquilino paga +10% sobre o valor base
-  - proprietario recebe valor base -4%
-- Mapa com busca por endereco/bairro e opcao de usar localizacao atual
-- Wizard de anuncio em 3 passos (info, local, fotos), com vagas de garagem
-- Perfil com foto do usuario, meus anuncios, minhas reservas e avaliacoes por tags
-- Moderacao simples com status `pending/approved/rejected`
-- Painel Admin dentro do Perfil para aprovar/rejeitar e marcar verificado
-
-## Estrutura do projeto
-```text
-lib/
-  core/
-    constants/
-    providers/
-    theme/
-    utils/
-    widgets/
-  features/
-    auth/
-    properties/
-    profile/
-    admin/
-  router/
-  app.dart
-  main.dart
-
-supabase_schema.sql
-.env.example
-```
-
-## Requisitos
-1. Flutter SDK instalado
-2. Conta Supabase
-3. VSCode com extensoes Flutter/Dart
-4. (Windows) Developer Mode ativo para plugins com symlink
-
-No Windows, se necessario:
-```powershell
-start ms-settings:developers
-```
-
-## Como rodar
-### 1) Instalar dependencias
+## Rodar local
+1. Instale Node.js 20+
+2. No terminal da pasta do projeto:
 ```bash
-flutter pub get
+npm install
 ```
-
-### 2) Configurar Supabase
-1. Crie um projeto no Supabase.
-2. Rode o SQL em `supabase_schema.sql` no SQL Editor.
-3. Ative **Email provider** em Auth > Sign In / Providers.
-4. Recomendado: em Auth > Providers > Email, desative confirmacao obrigatoria de email para testes locais.
-5. Crie um bucket publico chamado `property-images` (ou use outro e ajuste `SUPABASE_BUCKET`).
-6. Pegue `SUPABASE_URL` e `SUPABASE_ANON_KEY` em Project Settings > API.
-
-### 3) Colocar chaves no Android
-No arquivo `android/local.properties`, adicione:
-```properties
-SUPABASE_URL=YOUR_SUPABASE_URL
-SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
-SUPABASE_BUCKET=property-images
-MAPS_API_KEY=YOUR_MAPS_API_KEY
+3. Crie `.env` com base em `.env.example`:
+```env
+VITE_SUPABASE_URL=https://SEU_PROJECT.supabase.co
+VITE_SUPABASE_ANON_KEY=SEU_ANON_KEY
+VITE_SUPABASE_BUCKET=property-images
 ```
-
-### 4) Executar app mobile (Android/emulador)
-```powershell
-.\run_android.ps1 -SupabaseUrl https://SEU_PROJETO.supabase.co -SupabaseAnonKey SUA_ANON_KEY
+4. Rode o app:
+```bash
+npm run dev
 ```
+5. Acesse:
+- App: `http://localhost:5173/`
+- Admin web: `http://localhost:5173/admin.html`
 
-### 5) Executar site admin web (separado do app)
-```powershell
-.\run_admin_web.ps1 -SupabaseUrl https://SEU_PROJETO.supabase.co -SupabaseAnonKey SUA_ANON_KEY
-```
+## Scripts PowerShell (abre CMD)
+- App: `./run_web.ps1`
+- Admin: `./run_admin_web.ps1`
+- Android Emulator (React web no emulador): `./run_android.ps1`
 
-### 6) Executar app web principal (opcional)
-```powershell
-.\run_web.ps1 -SupabaseUrl https://SEU_PROJETO.supabase.co -SupabaseAnonKey SUA_ANON_KEY
-```
+Obs: os scripts leem automaticamente `.env` (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_SUPABASE_BUCKET`).
+Se quiser, voce ainda pode sobrescrever por parametro.
 
-## Tabelas (Supabase)
-### `users`
-- `id` (uuid, PK)
-- `name` (text)
-- `phone` (text)
-- `avatar_url` (text)
-- `cpf` (text)
-- `email` (text)
-- `birth_date` (date)
-- `role` (text)
-- `created_at` (timestamptz)
+## Supabase obrigatorio
+1. Rode o SQL de `supabase_schema.sql` no SQL Editor.
+2. Crie bucket `property-images` em Storage.
+3. Garanta que o usuario admin tenha `role = 'admin'` na tabela `public.users`.
 
-### `properties`
-- `id` (uuid, PK)
-- `owner_id` (uuid)
-- `title` (text)
-- `description` (text)
-- `price` (int)
-- `rent_type` (text)
-- `bedrooms` (int)
-- `bathrooms` (int)
-- `garage_spots` (int)
-- `pet_friendly` (bool)
-- `verified` (bool)
-- `status` (text)
-- `photos` (text[])
-- `location` (jsonb)
-- `created_at`, `updated_at` (timestamptz)
-- `views_count` (int)
-
-### `bookings`
-- `id` (uuid, PK)
-- `property_id` (uuid)
-- `property_title` (text)
-- `renter_id` (uuid)
-- `owner_id` (uuid)
-- `check_in_date`, `check_out_date` (timestamptz)
-- `units` (int)
-- `base_amount` (int)
-- `client_fee_amount` (int)
-- `owner_fee_amount` (int)
-- `total_paid_by_renter` (int)
-- `owner_payout_amount` (int)
-- `status` (text)
-- `created_at`, `updated_at` (timestamptz)
-
-### `owner_reviews`
-- `id` (uuid, PK)
-- `booking_id` (uuid, unique)
-- `property_id` (uuid)
-- `renter_id` (uuid)
-- `owner_id` (uuid)
-- `rating` (int 1..5)
-- `tags` (text[])
-- `comment` (text)
-- `created_at` (timestamptz)
-
-## Admin
-Para promover um usuario a admin, ajuste manualmente no Supabase:
-- tabela `users`
-- campo `role = 'admin'`
-
-Exemplo por telefone:
+Exemplo para promover admin:
 ```sql
 update public.users
 set role = 'admin'
 where phone = '+5553999005952';
 ```
 
-## Observacao sobre login por telefone
-- O fluxo atual usa `signInWithPassword` do Supabase Auth.
-- Quando o usuario informa telefone no login, o app resolve o email pela RPC `get_login_email_by_phone` e autentica com email+senha.
-- Sempre que alterar o schema local, rode novamente todo o SQL de `supabase_schema.sql` no SQL Editor.
-- Se executar com `SUPABASE_URL=...` (reticencias), o app agora mostra erro de configuracao em tela.
-- Os scripts `run_android.ps1`, `run_web.ps1` e `run_admin_web.ps1` leem `android/local.properties` automaticamente.
+## Fluxos implementados
+- Entrada com background + botoes `Criar conta` e `Ja tenho conta`
+- Cadastro: nome, telefone, CPF, email, data de nascimento digitada, senha forte
+- Login por email/senha ou telefone/senha (resolve email via RPC)
+- Feed com filtros (mensal/temporada/diaria, pet, preco, quartos)
+- Detalhe com WhatsApp, reserva e calculo de taxas (10% cliente, 4% dono)
+- Anunciar em 3 passos com minimo 3 fotos e upload para Supabase Storage
+- Edicao de anuncio com gerenciamento de fotos (adicionar/remover/capa)
+- Perfil com upload de avatar, meus anuncios, reservas e avaliacoes por tags
+- Painel admin separado para aprovar/rejeitar/verificar anuncios com atualizacao em tempo real
 
-## TODO (proximas melhorias)
-1. Integracao real de pagamento/escrow (Stripe/Mercado Pago/Pagar.me)
-2. Regras SQL para bloqueio automatico de overbooking por range
-3. Motor de precificacao dinamica por temporada
-4. Favoritos, notificacoes e analytics de conversao
+## Observacoes
+- O projeto foi migrado para React web e nao depende mais de Flutter para execucao principal.
+- Se o bucket nao existir, o app mostra erro explicito de configuracao.
+- O script `run_android.ps1` sobe o Vite, faz `adb reverse` e abre `http://localhost:5173` no emulador Android.

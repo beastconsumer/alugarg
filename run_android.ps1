@@ -1,34 +1,65 @@
-param(
+﻿param(
   [string]$SupabaseUrl = $env:SUPABASE_URL,
   [string]$SupabaseAnonKey = $env:SUPABASE_ANON_KEY,
   [string]$SupabaseBucket = $env:SUPABASE_BUCKET,
-  [string]$EmulatorId = "Medium_Phone_API_36.1"
+  [string]$AvdName = "Medium_Phone_API_36.1",
+  [int]$Port = 5173
 )
 
-function Get-LocalPropertyValue([string]$Key) {
-  $localPropsPath = Join-Path $PSScriptRoot "android\local.properties"
-  if (-not (Test-Path $localPropsPath)) { return $null }
-  $line = Get-Content $localPropsPath | Where-Object { $_ -match "^$Key=" } | Select-Object -First 1
-  if (-not $line) { return $null }
-  return ($line -replace "^$Key=", "").Trim()
+function Get-DotEnvValue([string]$Key) {
+  $envPath = Join-Path $PSScriptRoot ".env"
+  if (-not (Test-Path $envPath)) {
+    return $null
+  }
+
+  foreach ($line in Get-Content $envPath) {
+    $trimmed = $line.Trim()
+    if ([string]::IsNullOrWhiteSpace($trimmed) -or $trimmed.StartsWith("#")) {
+      continue
+    }
+
+    if ($trimmed -match "^$Key=(.*)$") {
+      $value = $matches[1].Trim()
+      if (
+        ($value.StartsWith('"') -and $value.EndsWith('"')) -or
+        ($value.StartsWith("'") -and $value.EndsWith("'"))
+      ) {
+        return $value.Substring(1, $value.Length - 2)
+      }
+      return $value
+    }
+  }
+
+  return $null
 }
 
 if ([string]::IsNullOrWhiteSpace($SupabaseUrl)) {
-  $SupabaseUrl = Get-LocalPropertyValue "SUPABASE_URL"
+  $SupabaseUrl = $env:VITE_SUPABASE_URL
+}
+if ([string]::IsNullOrWhiteSpace($SupabaseUrl)) {
+  $SupabaseUrl = Get-DotEnvValue "VITE_SUPABASE_URL"
+}
+
+if ([string]::IsNullOrWhiteSpace($SupabaseAnonKey)) {
+  $SupabaseAnonKey = $env:VITE_SUPABASE_ANON_KEY
 }
 if ([string]::IsNullOrWhiteSpace($SupabaseAnonKey)) {
-  $SupabaseAnonKey = Get-LocalPropertyValue "SUPABASE_ANON_KEY"
+  $SupabaseAnonKey = Get-DotEnvValue "VITE_SUPABASE_ANON_KEY"
+}
+
+if ([string]::IsNullOrWhiteSpace($SupabaseBucket)) {
+  $SupabaseBucket = $env:VITE_SUPABASE_BUCKET
 }
 if ([string]::IsNullOrWhiteSpace($SupabaseBucket)) {
-  $SupabaseBucket = Get-LocalPropertyValue "SUPABASE_BUCKET"
+  $SupabaseBucket = Get-DotEnvValue "VITE_SUPABASE_BUCKET"
 }
 
 if ([string]::IsNullOrWhiteSpace($SupabaseUrl)) {
-  Write-Host "SUPABASE_URL nao definido." -ForegroundColor Yellow
+  Write-Host "SUPABASE_URL nao definido. Configure .env (VITE_SUPABASE_URL)." -ForegroundColor Yellow
   exit 1
 }
 if ([string]::IsNullOrWhiteSpace($SupabaseAnonKey)) {
-  Write-Host "SUPABASE_ANON_KEY nao definido." -ForegroundColor Yellow
+  Write-Host "SUPABASE_ANON_KEY nao definido. Configure .env (VITE_SUPABASE_ANON_KEY)." -ForegroundColor Yellow
   exit 1
 }
 if ([string]::IsNullOrWhiteSpace($SupabaseBucket)) {
@@ -38,30 +69,63 @@ if ([string]::IsNullOrWhiteSpace($SupabaseBucket)) {
 $invalidUrl = $SupabaseUrl.Contains("...") -or $SupabaseUrl.Contains("YOUR_")
 $invalidAnon = $SupabaseAnonKey.Contains("...") -or $SupabaseAnonKey.Contains("YOUR_")
 if ($invalidUrl -or $invalidAnon) {
-  Write-Host "As chaves Supabase estao com placeholders (ex: ... ou YOUR_)." -ForegroundColor Red
-  Write-Host "Ajuste android/local.properties ou passe -SupabaseUrl/-SupabaseAnonKey reais." -ForegroundColor Yellow
+  Write-Host "As chaves Supabase estao com placeholders." -ForegroundColor Red
   exit 1
 }
 
-$adb = "C:\Users\Pichau\AppData\Local\Android\sdk\platform-tools\adb.exe"
-$deviceOnline = $false
-
-if (Test-Path $adb) {
-  & $adb start-server | Out-Null
-  $adbList = & $adb devices
-  if ($adbList -match "emulator-5554\s+device") {
-    $deviceOnline = $true
-  }
+$sdkRoot = $env:ANDROID_SDK_ROOT
+if ([string]::IsNullOrWhiteSpace($sdkRoot)) {
+  $sdkRoot = $env:ANDROID_HOME
+}
+if ([string]::IsNullOrWhiteSpace($sdkRoot)) {
+  $sdkRoot = Join-Path $env:LOCALAPPDATA "Android\Sdk"
 }
 
-if (-not $deviceOnline) {
-  Write-Host "Iniciando emulador: $EmulatorId" -ForegroundColor Cyan
-  flutter emulators --launch $EmulatorId | Out-Null
-  if (Test-Path $adb) {
-    & $adb wait-for-device | Out-Null
-  }
+$adbPath = Join-Path $sdkRoot "platform-tools\adb.exe"
+$emulatorPath = Join-Path $sdkRoot "emulator\emulator.exe"
+
+if (-not (Test-Path $adbPath)) {
+  Write-Host "ADB nao encontrado em: $adbPath" -ForegroundColor Red
+  exit 1
 }
 
-$cmd = "flutter run -d emulator-5554 --dart-define=SUPABASE_URL=$SupabaseUrl --dart-define=SUPABASE_ANON_KEY=$SupabaseAnonKey --dart-define=SUPABASE_BUCKET=$SupabaseBucket"
-Write-Host "Executando: $cmd" -ForegroundColor Cyan
-Start-Process -FilePath "cmd.exe" -ArgumentList "/k", "cd /d $PSScriptRoot && $cmd"
+& $adbPath start-server | Out-Null
+$devices = & $adbPath devices
+$hasEmulator = ($devices -match "emulator-\d+\s+device")
+
+if (-not $hasEmulator) {
+  if (-not (Test-Path $emulatorPath)) {
+    Write-Host "Emulator nao encontrado em: $emulatorPath" -ForegroundColor Red
+    exit 1
+  }
+
+  Write-Host "Iniciando AVD: $AvdName" -ForegroundColor Cyan
+  Start-Process -FilePath $emulatorPath -ArgumentList "-avd", $AvdName
+
+  Write-Host "Aguardando emulador ficar online..." -ForegroundColor Cyan
+  & $adbPath wait-for-device | Out-Null
+
+  Start-Sleep -Seconds 12
+}
+
+$cmd = @(
+  "cd /d $PSScriptRoot",
+  ('set "VITE_SUPABASE_URL={0}"' -f $SupabaseUrl),
+  ('set "VITE_SUPABASE_ANON_KEY={0}"' -f $SupabaseAnonKey),
+  ('set "VITE_SUPABASE_BUCKET={0}"' -f $SupabaseBucket),
+  "if not exist node_modules npm install",
+  "npm run dev -- --host 0.0.0.0 --port $Port"
+) -join " && "
+
+Write-Host "Subindo React em novo CMD..." -ForegroundColor Cyan
+Start-Process -FilePath "cmd.exe" -ArgumentList "/k", $cmd
+
+Start-Sleep -Seconds 6
+
+Write-Host "Configurando adb reverse para localhost:$Port" -ForegroundColor Cyan
+& $adbPath reverse "tcp:$Port" "tcp:$Port" | Out-Null
+
+Write-Host "Abrindo no navegador do emulador..." -ForegroundColor Cyan
+& $adbPath shell am start -a android.intent.action.VIEW -d "http://localhost:$Port" | Out-Null
+
+Write-Host "Pronto. O app React deve abrir no emulador Android." -ForegroundColor Green
