@@ -16,6 +16,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { BellRing, Building2, Minus, PartyPopper, Plus, Search } from 'lucide-react';
 import { PropertyCard } from '../components/PropertyCard';
+import { seedProperties } from '../lib/seedProperties';
 import { supabase } from '../lib/supabase';
 import { parseProperty, Property, RentType } from '../lib/types';
 
@@ -95,7 +96,10 @@ export function HomePage() {
         .limit(120);
 
       if (error) throw error;
-      setAllProperties((data ?? []).map((row) => parseProperty(row)));
+      const dbProperties = (data ?? []).map((row) => parseProperty(row));
+      const merged = [...seedProperties, ...dbProperties];
+      const deduped = Array.from(new Map(merged.map((item) => [item.id, item])).values());
+      setAllProperties(deduped);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Falha ao carregar feed');
     } finally {

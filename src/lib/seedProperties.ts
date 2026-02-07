@@ -1,0 +1,153 @@
+import { Property, UserProfile } from './types';
+
+const nowIso = new Date().toISOString();
+
+const seedOwners: UserProfile[] = [
+  {
+    id: 'b4d7be24-6c98-4df4-8267-f0c2ca27a0a1',
+    name: 'Corretor Cassino 01',
+    phone: '+555399117001',
+    avatar_url: '',
+    cpf: '',
+    email: 'corretor01@alugaaluga.app',
+    birth_date: null,
+    role: 'user',
+    created_at: nowIso,
+  },
+  {
+    id: 'f2af0d9e-fd76-4f6e-a5b4-6fa8ad3852d3',
+    name: 'Corretor Cassino 02',
+    phone: '+555399117002',
+    avatar_url: '',
+    cpf: '',
+    email: 'corretor02@alugaaluga.app',
+    birth_date: null,
+    role: 'user',
+    created_at: nowIso,
+  },
+];
+
+export const seedProperties: Property[] = [
+  {
+    id: 'a59f1bcb-e738-4b0f-8f4c-2efe989d9274',
+    owner_id: 'b4d7be24-6c98-4df4-8267-f0c2ca27a0a1',
+    title: 'Casa para alugar no Cassino - 5 quartos',
+    description:
+      'Excelente casa de alto padrao no Balneario Cassino, ideal para morar o ano inteiro com conforto. Possui 5 dormitorios, sala de estar, cozinha, area de servico, quintal com piscina, espaco gourmet com churrasqueira e garagem coberta.',
+    price: 7700,
+    rent_type: 'mensal',
+    bedrooms: 5,
+    bathrooms: 3,
+    garage_spots: 1,
+    guests_capacity: 10,
+    suites: 1,
+    area_m2: 280,
+    pet_friendly: true,
+    furnished: true,
+    smoking_allowed: false,
+    events_allowed: false,
+    amenities: ['piscina', 'churrasqueira', 'cozinha_completa', 'wifi', 'ar_condicionado', 'smart_tv'],
+    house_rules: 'Sem festas e respeitar horario de silencio do condominio.',
+    check_in_time: '14:00',
+    check_out_time: '11:00',
+    minimum_nights: 30,
+    cleaning_fee: 0,
+    security_deposit: 0,
+    verified: true,
+    status: 'approved',
+    photos: ['https://cdn.vistahost.com.br/marcosotero7176/fotos/18074/i2w7v2YUn47HYXGrOW55F_1807467585299acb17.jpg'],
+    location: {
+      lat: null,
+      lng: null,
+      addressText: 'Balneario Cassino, Rio Grande - RS',
+    },
+    created_at: nowIso,
+    updated_at: nowIso,
+    views_count: 639,
+  },
+  {
+    id: 'b876ee2e-cf51-4aa2-86bc-bf262565e640',
+    owner_id: 'f2af0d9e-fd76-4f6e-a5b4-6fa8ad3852d3',
+    title: 'Casa em condominio no Cassino - 2 quartos',
+    description:
+      'Casa mista em condominio fechado no Balneario Cassino, localizada em avenida principal e proxima de comercio e servicos. Possui 2 dormitorios, sala, cozinha, banheiro social, garagem coberta e churrasqueira individual.',
+    price: 1400,
+    rent_type: 'mensal',
+    bedrooms: 2,
+    bathrooms: 1,
+    garage_spots: 1,
+    guests_capacity: 4,
+    suites: 0,
+    area_m2: 68,
+    pet_friendly: true,
+    furnished: false,
+    smoking_allowed: false,
+    events_allowed: false,
+    amenities: ['wifi', 'churrasqueira', 'portaria_24h', 'cozinha_completa'],
+    house_rules: 'Uso residencial e convivencia tranquila entre moradores.',
+    check_in_time: '14:00',
+    check_out_time: '11:00',
+    minimum_nights: 30,
+    cleaning_fee: 0,
+    security_deposit: 0,
+    verified: true,
+    status: 'approved',
+    photos: ['https://cdn.vistahost.com.br/marcosotero7176/fotos/13572/i07393446d75w1QJ6r3_13572629618c41abb2.jpg'],
+    location: {
+      lat: null,
+      lng: null,
+      addressText: 'Avenida Rio Grande, Cassino - Rio Grande - RS',
+    },
+    created_at: nowIso,
+    updated_at: nowIso,
+    views_count: 410,
+  },
+  {
+    id: '34b2af24-cde4-4ec2-8af3-05d38dbcb8ed',
+    owner_id: 'b4d7be24-6c98-4df4-8267-f0c2ca27a0a1',
+    title: 'Casa com piscina no Cassino - 2 quartos',
+    description:
+      'Casa em pequeno condominio fechado no Cassino, ideal para moradia anual com seguranca e conforto. Possui 2 dormitorios, sala de estar, cozinha, quintal, churrasqueira e area de piscina.',
+    price: 2200,
+    rent_type: 'mensal',
+    bedrooms: 2,
+    bathrooms: 2,
+    garage_spots: 1,
+    guests_capacity: 4,
+    suites: 0,
+    area_m2: 74,
+    pet_friendly: true,
+    furnished: false,
+    smoking_allowed: false,
+    events_allowed: false,
+    amenities: ['piscina', 'churrasqueira', 'cozinha_completa', 'wifi'],
+    house_rules: 'Respeitar regras internas do condominio e areas comuns.',
+    check_in_time: '14:00',
+    check_out_time: '11:00',
+    minimum_nights: 30,
+    cleaning_fee: 0,
+    security_deposit: 0,
+    verified: true,
+    status: 'approved',
+    photos: ['https://cdn.vistahost.com.br/marcosotero7176/fotos/18229/i66A9J98l6iH5c_1822967afac74bf391.jpg'],
+    location: {
+      lat: null,
+      lng: null,
+      addressText: 'Cassino, Rio Grande - RS',
+    },
+    created_at: nowIso,
+    updated_at: nowIso,
+    views_count: 687,
+  },
+];
+
+const seedById = new Map(seedProperties.map((item) => [item.id, item]));
+const seedOwnerById = new Map(seedOwners.map((item) => [item.id, item]));
+
+export const findSeedPropertyById = (id: string): Property | undefined => {
+  return seedById.get(id);
+};
+
+export const findSeedOwnerById = (id: string): UserProfile | undefined => {
+  return seedOwnerById.get(id);
+};

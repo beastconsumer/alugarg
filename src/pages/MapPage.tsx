@@ -6,6 +6,7 @@ import L from 'leaflet';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+import { seedProperties } from '../lib/seedProperties';
 import { supabase } from '../lib/supabase';
 import { formatMoney } from '../lib/format';
 import { parseProperty, Property } from '../lib/types';
@@ -190,7 +191,10 @@ export function MapPage() {
           .order('created_at', { ascending: false });
 
         if (error) throw error;
-        setProperties((data ?? []).map((row) => parseProperty(row)));
+        const dbProperties = (data ?? []).map((row) => parseProperty(row));
+        const merged = [...seedProperties, ...dbProperties];
+        const deduped = Array.from(new Map(merged.map((item) => [item.id, item])).values());
+        setProperties(deduped);
       } catch (error) {
         setErrorMessage(error instanceof Error ? error.message : 'Erro ao carregar mapa');
       } finally {
@@ -345,4 +349,3 @@ export function MapPage() {
     </Stack>
   );
 }
-
