@@ -58,8 +58,15 @@ if ([string]::IsNullOrWhiteSpace($SupabaseBucket)) {
   $SupabaseBucket = 'property-images'
 }
 
+$invalidUrl = $SupabaseUrl.Contains('...') -or $SupabaseUrl.Contains('YOUR_')
+$invalidAnon = $SupabaseAnonKey.Contains('...') -or $SupabaseAnonKey.Contains('YOUR_')
+if ($invalidUrl -or $invalidAnon) {
+  Write-Host 'As chaves Supabase estao com placeholders.' -ForegroundColor Red
+  exit 1
+}
+
 $localAdminUrl = "http://127.0.0.1:$Port/admin.html"
-$hasServer = netstat -ano | Select-String ":$Port\\s+.*LISTENING"
+$hasServer = netstat -ano | Select-String ":$Port\s+.*LISTENING"
 
 if ($hasServer) {
   Write-Host "Servidor local ja ativo na porta $Port. Abrindo admin..." -ForegroundColor Cyan
@@ -68,17 +75,20 @@ if ($hasServer) {
   exit 0
 }
 
-$cmd = @(
-  "cd /d $PSScriptRoot",
+$launcherPath = Join-Path $PSScriptRoot '.run_admin_local.cmd'
+$launcherLines = @(
+  '@echo off',
+  ('cd /d "{0}"' -f $PSScriptRoot),
   ('set "VITE_SUPABASE_URL={0}"' -f $SupabaseUrl),
   ('set "VITE_SUPABASE_ANON_KEY={0}"' -f $SupabaseAnonKey),
   ('set "VITE_SUPABASE_BUCKET={0}"' -f $SupabaseBucket),
   'if not exist node_modules npm install',
-  "npm run dev -- --host 127.0.0.1 --port $Port --strictPort"
-) -join ' && '
+  ('npm run dev -- --host 127.0.0.1 --port {0} --strictPort' -f $Port)
+)
+$launcherLines | Set-Content -Path $launcherPath -Encoding ascii
 
 Write-Host 'Subindo servidor local para admin...' -ForegroundColor Cyan
-Start-Process -FilePath 'cmd.exe' -ArgumentList '/k', $cmd
+Start-Process -FilePath 'cmd.exe' -ArgumentList '/k', ('"{0}"' -f $launcherPath)
 
 Start-Sleep -Seconds 2
 Start-Process $localAdminUrl

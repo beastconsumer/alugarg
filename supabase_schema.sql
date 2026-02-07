@@ -192,7 +192,20 @@ create table if not exists public.properties (
   bedrooms integer not null,
   bathrooms integer not null,
   garage_spots integer not null default 0,
+  guests_capacity integer not null default 1,
+  suites integer not null default 0,
+  area_m2 integer not null default 0,
   pet_friendly boolean not null default false,
+  furnished boolean not null default false,
+  smoking_allowed boolean not null default false,
+  events_allowed boolean not null default false,
+  amenities text[] not null default '{}',
+  house_rules text not null default '',
+  check_in_time text not null default '14:00',
+  check_out_time text not null default '11:00',
+  minimum_nights integer not null default 1,
+  cleaning_fee integer not null default 0,
+  security_deposit integer not null default 0,
   verified boolean not null default false,
   status text not null default 'pending',
   photos text[] not null default '{}',
@@ -203,6 +216,19 @@ create table if not exists public.properties (
 );
 
 alter table public.properties add column if not exists garage_spots integer not null default 0;
+alter table public.properties add column if not exists guests_capacity integer not null default 1;
+alter table public.properties add column if not exists suites integer not null default 0;
+alter table public.properties add column if not exists area_m2 integer not null default 0;
+alter table public.properties add column if not exists furnished boolean not null default false;
+alter table public.properties add column if not exists smoking_allowed boolean not null default false;
+alter table public.properties add column if not exists events_allowed boolean not null default false;
+alter table public.properties add column if not exists amenities text[] not null default '{}';
+alter table public.properties add column if not exists house_rules text not null default '';
+alter table public.properties add column if not exists check_in_time text not null default '14:00';
+alter table public.properties add column if not exists check_out_time text not null default '11:00';
+alter table public.properties add column if not exists minimum_nights integer not null default 1;
+alter table public.properties add column if not exists cleaning_fee integer not null default 0;
+alter table public.properties add column if not exists security_deposit integer not null default 0;
 
 create index if not exists properties_status_created_at_idx on public.properties (status, created_at desc);
 create index if not exists properties_owner_created_at_idx on public.properties (owner_id, created_at desc);

@@ -10,15 +10,24 @@
     "preview": "vite preview --host"
   },
   "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@mantine/core": "^8.3.14",
+    "@mantine/dates": "^8.3.14",
+    "@mantine/hooks": "^8.3.14",
+    "@mantine/notifications": "^8.3.14",
     "@supabase/supabase-js": "^2.56.0",
     "browser-image-compression": "^2.0.2",
     "date-fns": "^4.1.0",
+    "framer-motion": "^12.33.0",
+    "leaflet": "^1.9.4",
     "lucide-react": "^0.544.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-leaflet": "^4.2.1",
     "react-router-dom": "^6.30.1"
   },
   "devDependencies": {
+    "@types/leaflet": "^1.9.21",
     "@types/react": "^18.3.24",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^4.7.0",

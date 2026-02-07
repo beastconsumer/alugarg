@@ -1,19 +1,86 @@
-﻿import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { RotateCcw } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  Badge,
+  Button,
+  Card,
+  Group,
+  Popover,
+  Stack,
+  Text,
+  TextInput,
+  Title,
+  UnstyledButton,
+} from '@mantine/core';
+import { DatePicker, type DatesRangeValue } from '@mantine/dates';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { BellRing, Building2, Minus, PartyPopper, Plus, Search } from 'lucide-react';
 import { PropertyCard } from '../components/PropertyCard';
 import { supabase } from '../lib/supabase';
 import { parseProperty, Property, RentType } from '../lib/types';
+
+type HomeCategory = 'acomodacoes' | 'experiencias' | 'servicos';
+
+type GuestState = {
+  adults: number;
+  children: number;
+  babies: number;
+  pets: number;
+};
+
+const destinationSuggestions = [
+  'Cassino, Rio Grande do Sul',
+  'Rio Grande, Rio Grande do Sul',
+  'Pelotas, Rio Grande do Sul',
+  'Sao Lourenco do Sul, Rio Grande do Sul',
+  'Porto Alegre, Rio Grande do Sul',
+  'Gramado, Rio Grande do Sul',
+];
+
+const rentTypeToggleData: Array<{ value: '' | RentType; label: string }> = [
+  { value: '', label: 'Datas' },
+  { value: 'mensal', label: 'Mensal' },
+  { value: 'temporada', label: 'Temporada' },
+  { value: 'diaria', label: 'Diaria' },
+];
+
+const formatDateRange = (value: DatesRangeValue): string => {
+  if (!value[0] && !value[1]) {
+    return 'Insira as datas';
+  }
+
+  if (value[0] && !value[1]) {
+    return format(value[0], 'dd MMM', { locale: ptBR });
+  }
+
+  if (value[0] && value[1]) {
+    return `${format(value[0], 'dd MMM', { locale: ptBR })} - ${format(value[1], 'dd MMM', { locale: ptBR })}`;
+  }
+
+  return 'Insira as datas';
+};
 
 export function HomePage() {
   const [allProperties, setAllProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
 
+  const [category, setCategory] = useState<HomeCategory>('acomodacoes');
+
   const [search, setSearch] = useState('');
+  const [destinationInput, setDestinationInput] = useState('');
+  const [dateRange, setDateRange] = useState<DatesRangeValue>([null, null]);
   const [rentType, setRentType] = useState<'' | RentType>('');
-  const [petFriendly, setPetFriendly] = useState(false);
-  const [maxPrice, setMaxPrice] = useState(10000);
-  const [bedrooms, setBedrooms] = useState(0);
+  const [guests, setGuests] = useState<GuestState>({
+    adults: 0,
+    children: 0,
+    babies: 0,
+    pets: 0,
+  });
+
+  const [whereOpen, setWhereOpen] = useState(false);
+  const [whenOpen, setWhenOpen] = useState(false);
+  const [whoOpen, setWhoOpen] = useState(false);
 
   const loadApprovedProperties = async () => {
     setLoading(true);
@@ -27,14 +94,10 @@ export function HomePage() {
         .order('created_at', { ascending: false })
         .limit(120);
 
-      if (error) {
-        throw error;
-      }
-
+      if (error) throw error;
       setAllProperties((data ?? []).map((row) => parseProperty(row)));
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Falha ao carregar feed';
-      setErrorMessage(message);
+      setErrorMessage(error instanceof Error ? error.message : 'Falha ao carregar feed');
     } finally {
       setLoading(false);
     }
@@ -63,26 +126,24 @@ export function HomePage() {
     };
   }, []);
 
+  const totalGuests = guests.adults + guests.children;
+
+  const whoLabel = useMemo(() => {
+    if (totalGuests <= 0 && guests.pets <= 0) return 'Hospedes?';
+    if (totalGuests > 0 && guests.pets > 0) return `${totalGuests} hospedes + ${guests.pets} pet`;
+    if (totalGuests > 0) return `${totalGuests} hospedes`;
+    return `${guests.pets} pet`;
+  }, [guests.pets, totalGuests]);
+
   const filteredProperties = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
 
     return allProperties.filter((property) => {
-      if (rentType && property.rent_type !== rentType) {
-        return false;
-      }
-      if (petFriendly && !property.pet_friendly) {
-        return false;
-      }
-      if (property.price > maxPrice) {
-        return false;
-      }
-      if (bedrooms > 0 && property.bedrooms < bedrooms) {
-        return false;
-      }
+      if (rentType && property.rent_type !== rentType) return false;
+      if (totalGuests > 0 && property.guests_capacity < totalGuests) return false;
+      if (guests.pets > 0 && !property.pet_friendly) return false;
 
-      if (!normalizedSearch) {
-        return true;
-      }
+      if (!normalizedSearch) return true;
 
       const searchable = [property.title, property.description, property.location.addressText]
         .join(' ')
@@ -90,114 +151,353 @@ export function HomePage() {
 
       return searchable.includes(normalizedSearch);
     });
-  }, [allProperties, bedrooms, maxPrice, petFriendly, rentType, search]);
+  }, [allProperties, guests.pets, rentType, search, totalGuests]);
 
-  const onResetFilters = (event: FormEvent) => {
-    event.preventDefault();
-    setSearch('');
-    setRentType('');
-    setPetFriendly(false);
-    setMaxPrice(10000);
-    setBedrooms(0);
+  const rowOneProperties = useMemo(() => {
+    const filtered = filteredProperties.filter((property) =>
+      property.location.addressText.toLowerCase().includes('cassino'),
+    );
+    return (filtered.length > 0 ? filtered : filteredProperties).slice(0, 14);
+  }, [filteredProperties]);
+
+  const rowTwoProperties = useMemo(() => {
+    const rowOneIds = new Set(rowOneProperties.map((property) => property.id));
+    const remaining = filteredProperties.filter((property) => !rowOneIds.has(property.id));
+    const ranked = (remaining.length > 0 ? remaining : filteredProperties).slice().sort((a, b) => {
+      if (b.views_count !== a.views_count) return b.views_count - a.views_count;
+      return b.price - a.price;
+    });
+    return ranked.slice(0, 14);
+  }, [filteredProperties, rowOneProperties]);
+
+  const showingProperties = category === 'acomodacoes';
+
+  const closeAllPanels = () => {
+    setWhereOpen(false);
+    setWhenOpen(false);
+    setWhoOpen(false);
+  };
+
+  const openPanel = (panel: 'where' | 'when' | 'who') => {
+    setWhereOpen(panel === 'where');
+    setWhenOpen(panel === 'when');
+    setWhoOpen(panel === 'who');
+  };
+
+  const updateGuest = (key: keyof GuestState, delta: number) => {
+    setGuests((current) => {
+      const nextValue = Math.max(0, current[key] + delta);
+      return { ...current, [key]: nextValue };
+    });
+  };
+
+  const applyDestination = (value: string) => {
+    setSearch(value);
+    setDestinationInput(value);
+    setWhereOpen(false);
   };
 
   return (
-    <main className="screen content-page">
-      <header className="page-header">
-        <div>
-          <h1>Aluga Aluga</h1>
-          <p className="muted">Balneario Cassino • Rio Grande</p>
-        </div>
-        <button className="btn btn-icon" onClick={() => void loadApprovedProperties()} title="Atualizar">
-          <RotateCcw size={18} />
-        </button>
-      </header>
+    <Stack gap="lg" py="md" pb={96}>
+      <Card radius="xl" withBorder p="lg" className="home-air-shell">
+        <Stack gap="lg">
+          <Group justify="space-between" align="center" gap="sm" className="home-air-tabs-row">
+            <Group className="home-air-tabs" justify="center" gap="xl" wrap="nowrap">
+              <button
+                type="button"
+                className={`home-air-tab ${category === 'acomodacoes' ? 'active' : ''}`}
+                onClick={() => setCategory('acomodacoes')}
+              >
+                <span className="home-air-tab-icon">
+                  <Building2 size={16} />
+                </span>
+                <span>Acomodacoes</span>
+              </button>
 
-      <section className="card filters-card">
-        <label className="field">
-          <span>Buscar por rua, bairro ou ponto</span>
-          <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Ex: Cassino, Avenida Atlantica"
-          />
-        </label>
+              <button
+                type="button"
+                className={`home-air-tab ${category === 'experiencias' ? 'active' : ''}`}
+                onClick={() => setCategory('experiencias')}
+              >
+                <span className="home-air-tab-icon">
+                  <PartyPopper size={16} />
+                </span>
+                <span>Experiencias</span>
+                <Badge size="xs" color="dark" variant="light">
+                  NOVO
+                </Badge>
+              </button>
 
-        <div className="chips-row">
-          <button
-            className={`chip-action ${rentType === 'mensal' ? 'active' : ''}`}
-            onClick={() => setRentType((value) => (value === 'mensal' ? '' : 'mensal'))}
-          >
-            Mensal
-          </button>
-          <button
-            className={`chip-action ${rentType === 'temporada' ? 'active' : ''}`}
-            onClick={() => setRentType((value) => (value === 'temporada' ? '' : 'temporada'))}
-          >
-            Temporada
-          </button>
-          <button
-            className={`chip-action ${rentType === 'diaria' ? 'active' : ''}`}
-            onClick={() => setRentType((value) => (value === 'diaria' ? '' : 'diaria'))}
-          >
-            Diaria
-          </button>
-          <button
-            className={`chip-action ${petFriendly ? 'active' : ''}`}
-            onClick={() => setPetFriendly((value) => !value)}
-          >
-            Pet
-          </button>
-        </div>
+              <button
+                type="button"
+                className={`home-air-tab ${category === 'servicos' ? 'active' : ''}`}
+                onClick={() => setCategory('servicos')}
+              >
+                <span className="home-air-tab-icon">
+                  <BellRing size={16} />
+                </span>
+                <span>Servicos</span>
+                <Badge size="xs" color="dark" variant="light">
+                  NOVO
+                </Badge>
+              </button>
+            </Group>
 
-        <div className="range-group">
-          <label>
-            <span>Ate R$ {maxPrice.toLocaleString('pt-BR')}</span>
-            <input
-              type="range"
-              min={500}
-              max={30000}
-              step={500}
-              value={maxPrice}
-              onChange={(event) => setMaxPrice(Number(event.target.value))}
-            />
-          </label>
+            <Text size="sm" fw={600} c="dimmed" className="home-air-host-cta">
+              Torne-se um anfitriao
+            </Text>
+          </Group>
 
-          <label>
-            <span>Quartos minimos: {bedrooms}</span>
-            <input
-              type="range"
-              min={0}
-              max={8}
-              step={1}
-              value={bedrooms}
-              onChange={(event) => setBedrooms(Number(event.target.value))}
-            />
-          </label>
-        </div>
+          <div className="home-air-search-wrap">
+            <div className="home-air-search home-air-search-airbnb">
+              <Popover
+                opened={whereOpen}
+                onChange={setWhereOpen}
+                width={360}
+                position="bottom-start"
+                shadow="md"
+                offset={10}
+              >
+                <Popover.Target>
+                  <UnstyledButton className="home-search-trigger" onClick={() => openPanel('where')}>
+                    <Text size="xs" fw={700}>
+                      Onde
+                    </Text>
+                    <Text className="home-search-trigger-value">{search || 'Buscar destinos'}</Text>
+                  </UnstyledButton>
+                </Popover.Target>
+                <Popover.Dropdown className="home-air-panel">
+                  <Stack gap="xs">
+                    <TextInput
+                      placeholder="Digite cidade, bairro ou ponto"
+                      value={destinationInput}
+                      onChange={(event) => setDestinationInput(event.currentTarget.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          applyDestination(destinationInput.trim() || search);
+                        }
+                      }}
+                    />
 
-        <button className="btn btn-outline" onClick={onResetFilters}>
-          Limpar filtros
-        </button>
-      </section>
+                    <Text size="xs" c="dimmed" fw={600}>
+                      Destinos sugeridos
+                    </Text>
 
-      {loading && <p className="muted">Carregando propriedades...</p>}
-      {errorMessage && <p className="alert error">{errorMessage}</p>}
+                    {destinationSuggestions.map((destination) => (
+                      <button
+                        key={destination}
+                        type="button"
+                        className="home-air-suggestion"
+                        onClick={() => applyDestination(destination)}
+                      >
+                        <span>{destination}</span>
+                      </button>
+                    ))}
+                  </Stack>
+                </Popover.Dropdown>
+              </Popover>
 
-      {!loading && !errorMessage && (
-        <section className="property-grid">
-          {filteredProperties.length === 0 && (
-            <div className="card">
-              <p className="muted">Nenhum imovel com esses filtros.</p>
+              <div className="home-air-divider" />
+
+              <Popover
+                opened={whenOpen}
+                onChange={setWhenOpen}
+                width={760}
+                position="bottom"
+                shadow="md"
+                offset={10}
+              >
+                <Popover.Target>
+                  <UnstyledButton className="home-search-trigger" onClick={() => openPanel('when')}>
+                    <Text size="xs" fw={700}>
+                      Quando
+                    </Text>
+                    <Text className="home-search-trigger-value">{formatDateRange(dateRange)}</Text>
+                  </UnstyledButton>
+                </Popover.Target>
+                <Popover.Dropdown className="home-air-panel home-air-panel-calendar">
+                  <Stack gap="sm">
+                    <Group gap="xs">
+                      {rentTypeToggleData.map((item) => (
+                        <button
+                          key={item.label}
+                          type="button"
+                          className={`home-air-pill ${rentType === item.value ? 'active' : ''}`}
+                          onClick={() => setRentType(item.value)}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </Group>
+
+                    <DatePicker
+                      type="range"
+                      numberOfColumns={2}
+                      locale="pt-BR"
+                      value={dateRange}
+                      onChange={setDateRange}
+                      minDate={new Date()}
+                    />
+                  </Stack>
+                </Popover.Dropdown>
+              </Popover>
+
+              <div className="home-air-divider" />
+
+              <Popover
+                opened={whoOpen}
+                onChange={setWhoOpen}
+                width={360}
+                position="bottom-end"
+                shadow="md"
+                offset={10}
+              >
+                <Popover.Target>
+                  <UnstyledButton className="home-search-trigger" onClick={() => openPanel('who')}>
+                    <Text size="xs" fw={700}>
+                      Quem
+                    </Text>
+                    <Text className="home-search-trigger-value">{whoLabel}</Text>
+                  </UnstyledButton>
+                </Popover.Target>
+                <Popover.Dropdown className="home-air-panel">
+                  <Stack gap="sm">
+                    <div className="home-guest-row">
+                      <div>
+                        <Text fw={700}>Adultos</Text>
+                        <Text size="sm" c="dimmed">
+                          13 anos ou mais
+                        </Text>
+                      </div>
+                      <Group gap={8}>
+                        <button type="button" className="home-guest-btn" onClick={() => updateGuest('adults', -1)}>
+                          <Minus size={14} />
+                        </button>
+                        <Text fw={700}>{guests.adults}</Text>
+                        <button type="button" className="home-guest-btn" onClick={() => updateGuest('adults', 1)}>
+                          <Plus size={14} />
+                        </button>
+                      </Group>
+                    </div>
+
+                    <div className="home-guest-row">
+                      <div>
+                        <Text fw={700}>Criancas</Text>
+                        <Text size="sm" c="dimmed">
+                          De 2 a 12 anos
+                        </Text>
+                      </div>
+                      <Group gap={8}>
+                        <button type="button" className="home-guest-btn" onClick={() => updateGuest('children', -1)}>
+                          <Minus size={14} />
+                        </button>
+                        <Text fw={700}>{guests.children}</Text>
+                        <button type="button" className="home-guest-btn" onClick={() => updateGuest('children', 1)}>
+                          <Plus size={14} />
+                        </button>
+                      </Group>
+                    </div>
+
+                    <div className="home-guest-row">
+                      <div>
+                        <Text fw={700}>Bebes</Text>
+                        <Text size="sm" c="dimmed">
+                          Menor de 2
+                        </Text>
+                      </div>
+                      <Group gap={8}>
+                        <button type="button" className="home-guest-btn" onClick={() => updateGuest('babies', -1)}>
+                          <Minus size={14} />
+                        </button>
+                        <Text fw={700}>{guests.babies}</Text>
+                        <button type="button" className="home-guest-btn" onClick={() => updateGuest('babies', 1)}>
+                          <Plus size={14} />
+                        </button>
+                      </Group>
+                    </div>
+
+                    <div className="home-guest-row">
+                      <div>
+                        <Text fw={700}>Animais de estimacao</Text>
+                        <Text size="sm" c="dimmed">
+                          Vai levar um animal?
+                        </Text>
+                      </div>
+                      <Group gap={8}>
+                        <button type="button" className="home-guest-btn" onClick={() => updateGuest('pets', -1)}>
+                          <Minus size={14} />
+                        </button>
+                        <Text fw={700}>{guests.pets}</Text>
+                        <button type="button" className="home-guest-btn" onClick={() => updateGuest('pets', 1)}>
+                          <Plus size={14} />
+                        </button>
+                      </Group>
+                    </div>
+                  </Stack>
+                </Popover.Dropdown>
+              </Popover>
+
+              <Button
+                className="home-air-search-submit"
+                radius="xl"
+                leftSection={<Search size={16} />}
+                onClick={() => {
+                  if (destinationInput.trim()) {
+                    setSearch(destinationInput.trim());
+                  }
+                  closeAllPanels();
+                }}
+              >
+                Buscar
+              </Button>
             </div>
-          )}
+          </div>
+        </Stack>
+      </Card>
 
-          {filteredProperties.map((property) => (
-            <PropertyCard key={property.id} property={property} />
-          ))}
-        </section>
-      )}
-    </main>
+      {loading ? <Text c="dimmed">Carregando propriedades...</Text> : null}
+      {errorMessage ? <Text c="red">{errorMessage}</Text> : null}
+
+      {!loading && !errorMessage ? (
+        showingProperties ? (
+          filteredProperties.length > 0 ? (
+            <Stack gap="xl">
+              <section className="home-carousel-section">
+                <Title order={3}>Acomodacoes em Balneario Cassino</Title>
+                <div className="home-horizontal-scroll">
+                  {rowOneProperties.map((property) => (
+                    <PropertyCard key={property.id} property={property} />
+                  ))}
+                </div>
+              </section>
+
+              <section className="home-carousel-section">
+                <Title order={3}>Acomodacoes muito procuradas em Rio Grande</Title>
+                <div className="home-horizontal-scroll">
+                  {rowTwoProperties.map((property) => (
+                    <PropertyCard key={property.id} property={property} />
+                  ))}
+                </div>
+              </section>
+            </Stack>
+          ) : (
+            <Card withBorder radius="xl" p="lg">
+              <Text c="dimmed">Nenhum imovel encontrado com os filtros atuais.</Text>
+            </Card>
+          )
+        ) : (
+          <Card radius="xl" withBorder p="lg" className="home-filter-card">
+            <Stack gap={6}>
+              <Title order={5}>
+                {category === 'experiencias' ? 'Experiencias em breve' : 'Servicos em breve'}
+              </Title>
+              <Text c="dimmed" size="sm">
+                Estamos preparando esta secao. Enquanto isso, explore as acomodacoes.
+              </Text>
+            </Stack>
+          </Card>
+        )
+      ) : null}
+    </Stack>
   );
 }
-

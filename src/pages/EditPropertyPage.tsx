@@ -1,6 +1,27 @@
-﻿import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import {
+  ActionIcon,
+  Alert,
+  Badge,
+  Button,
+  Card,
+  FileInput,
+  Group,
+  MultiSelect,
+  NumberInput,
+  Select,
+  SimpleGrid,
+  Stack,
+  Switch,
+  Text,
+  TextInput,
+  Textarea,
+  Title,
+} from '@mantine/core';
+import { ImagePlus, Star, Trash2 } from 'lucide-react';
 import { useAuth } from '../state/AuthContext';
+import { amenityOptions } from '../lib/propertyCatalog';
 import { supabase, uploadImageAndGetPublicUrl } from '../lib/supabase';
 import { parseProperty, Property, RentType } from '../lib/types';
 
@@ -19,8 +40,8 @@ interface NewPhoto {
 
 type DraftPhoto = ExistingPhoto | NewPhoto;
 
-const createDrafts = (files: FileList): NewPhoto[] =>
-  Array.from(files).map((file) => ({
+const createDrafts = (files: File[]): NewPhoto[] =>
+  files.map((file) => ({
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
     type: 'new' as const,
     file,
@@ -39,12 +60,25 @@ export function EditPropertyPage() {
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [price, setPrice] = useState('');
+  const [price, setPrice] = useState<number | ''>('');
   const [rentType, setRentType] = useState<RentType>('mensal');
   const [bedrooms, setBedrooms] = useState(1);
   const [bathrooms, setBathrooms] = useState(1);
   const [garageSpots, setGarageSpots] = useState(0);
+  const [guestsCapacity, setGuestsCapacity] = useState(2);
+  const [suites, setSuites] = useState(0);
+  const [areaM2, setAreaM2] = useState(0);
+  const [minimumNights, setMinimumNights] = useState(1);
+  const [checkInTime, setCheckInTime] = useState('14:00');
+  const [checkOutTime, setCheckOutTime] = useState('11:00');
+  const [cleaningFee, setCleaningFee] = useState(0);
+  const [securityDeposit, setSecurityDeposit] = useState(0);
   const [petFriendly, setPetFriendly] = useState(false);
+  const [furnished, setFurnished] = useState(true);
+  const [smokingAllowed, setSmokingAllowed] = useState(false);
+  const [eventsAllowed, setEventsAllowed] = useState(false);
+  const [amenities, setAmenities] = useState<string[]>([]);
+  const [houseRules, setHouseRules] = useState('');
   const [addressText, setAddressText] = useState('');
   const [latText, setLatText] = useState('');
   const [lngText, setLngText] = useState('');
@@ -62,9 +96,7 @@ export function EditPropertyPage() {
 
   useEffect(() => {
     const run = async () => {
-      if (!id || !user) {
-        return;
-      }
+      if (!id || !user) return;
 
       setLoading(true);
       setErrorMessage('');
@@ -77,24 +109,32 @@ export function EditPropertyPage() {
           .eq('owner_id', user.id)
           .maybeSingle();
 
-        if (error) {
-          throw error;
-        }
-
-        if (!data) {
-          throw new Error('Anuncio nao encontrado ou sem permissao para editar.');
-        }
+        if (error) throw error;
+        if (!data) throw new Error('Anuncio nao encontrado ou sem permissao para editar.');
 
         const parsed = parseProperty(data);
         setProperty(parsed);
         setTitle(parsed.title);
         setDescription(parsed.description);
-        setPrice(String(parsed.price));
+        setPrice(parsed.price);
         setRentType(parsed.rent_type);
         setBedrooms(parsed.bedrooms);
         setBathrooms(parsed.bathrooms);
         setGarageSpots(parsed.garage_spots);
+        setGuestsCapacity(parsed.guests_capacity);
+        setSuites(parsed.suites);
+        setAreaM2(parsed.area_m2);
+        setMinimumNights(parsed.minimum_nights);
+        setCheckInTime(parsed.check_in_time || '14:00');
+        setCheckOutTime(parsed.check_out_time || '11:00');
+        setCleaningFee(parsed.cleaning_fee);
+        setSecurityDeposit(parsed.security_deposit);
         setPetFriendly(parsed.pet_friendly);
+        setFurnished(parsed.furnished);
+        setSmokingAllowed(parsed.smoking_allowed);
+        setEventsAllowed(parsed.events_allowed);
+        setAmenities(parsed.amenities);
+        setHouseRules(parsed.house_rules);
         setAddressText(parsed.location.addressText);
         setLatText(parsed.location.lat?.toString() ?? '');
         setLngText(parsed.location.lng?.toString() ?? '');
@@ -115,23 +155,16 @@ export function EditPropertyPage() {
     void run();
   }, [id, user]);
 
-  const onAddPhotos = (event: ChangeEvent<HTMLInputElement>) => {
-    const fileList = event.target.files;
-    if (!fileList || fileList.length === 0) {
-      return;
-    }
-
-    const drafts = createDrafts(fileList);
+  const onAddPhotos = (files: File[] | null) => {
+    if (!files || files.length === 0) return;
+    const drafts = createDrafts(files);
     setDraftPhotos((current) => [...current, ...drafts]);
-    event.target.value = '';
   };
 
   const removePhoto = (idToRemove: string) => {
     setDraftPhotos((current) => {
       const selected = current.find((item) => item.id === idToRemove);
-      if (selected?.type === 'new') {
-        URL.revokeObjectURL(selected.previewUrl);
-      }
+      if (selected?.type === 'new') URL.revokeObjectURL(selected.previewUrl);
       return current.filter((item) => item.id !== idToRemove);
     });
   };
@@ -139,10 +172,7 @@ export function EditPropertyPage() {
   const setAsCover = (idToMove: string) => {
     setDraftPhotos((current) => {
       const index = current.findIndex((item) => item.id === idToMove);
-      if (index < 0) {
-        return current;
-      }
-
+      if (index < 0) return current;
       const clone = [...current];
       const [selected] = clone.splice(index, 1);
       clone.unshift(selected);
@@ -152,9 +182,7 @@ export function EditPropertyPage() {
 
   const hasMinimumPhotos = useMemo(() => draftPhotos.length >= 3, [draftPhotos.length]);
 
-  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
+  const onSubmit = async () => {
     if (!user || !property) {
       setErrorMessage('Sessao invalida.');
       return;
@@ -195,7 +223,20 @@ export function EditPropertyPage() {
           bedrooms,
           bathrooms,
           garage_spots: garageSpots,
+          guests_capacity: guestsCapacity,
+          suites,
+          area_m2: areaM2,
+          minimum_nights: minimumNights,
+          check_in_time: checkInTime,
+          check_out_time: checkOutTime,
+          cleaning_fee: cleaningFee,
+          security_deposit: securityDeposit,
           pet_friendly: petFriendly,
+          furnished,
+          smoking_allowed: smokingAllowed,
+          events_allowed: eventsAllowed,
+          amenities,
+          house_rules: houseRules.trim(),
           photos: finalUrls,
           location: {
             lat: Number.isFinite(lat) ? lat : null,
@@ -207,10 +248,7 @@ export function EditPropertyPage() {
         .eq('id', property.id)
         .eq('owner_id', user.id);
 
-      if (error) {
-        throw error;
-      }
-
+      if (error) throw error;
       navigate('/app/profile', { replace: true });
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Falha ao salvar edicao');
@@ -221,144 +259,195 @@ export function EditPropertyPage() {
 
   if (loading) {
     return (
-      <main className="screen content-page">
-        <p className="muted">Carregando anuncio...</p>
-      </main>
+      <Stack py="md" pb={96}>
+        <Text c="dimmed">Carregando anuncio...</Text>
+      </Stack>
     );
   }
 
   if (!property) {
     return (
-      <main className="screen content-page">
-        <p className="alert error">Anuncio nao encontrado.</p>
-      </main>
+      <Stack py="md" pb={96}>
+        <Alert color="red">Anuncio nao encontrado.</Alert>
+      </Stack>
     );
   }
 
   return (
-    <main className="screen content-page">
-      <header className="page-header">
-        <h1>Editar anuncio</h1>
-      </header>
+    <Stack gap="md" py="md" pb={96}>
+      <Card withBorder radius="xl" p="lg">
+        <Stack gap={6}>
+          <Title order={2}>Editar anuncio</Title>
+          <Text c="dimmed">Atualize estrutura completa, comodidades premium e regras do imovel.</Text>
+        </Stack>
+      </Card>
 
-      <section className="card">
-        <form className="stack gap-12" onSubmit={onSubmit}>
-          <label className="field">
-            <span>Titulo</span>
-            <input value={title} onChange={(event) => setTitle(event.target.value)} required />
-          </label>
+      <Card withBorder radius="xl" p="lg">
+        <Stack gap="md">
+          <Title order={4}>Dados principais</Title>
+          <TextInput label="Titulo" value={title} onChange={(event) => setTitle(event.currentTarget.value)} required />
 
-          <label className="field">
-            <span>Descricao</span>
-            <textarea rows={4} value={description} onChange={(event) => setDescription(event.target.value)} required />
-          </label>
+          <Textarea
+            label="Descricao"
+            minRows={4}
+            value={description}
+            onChange={(event) => setDescription(event.currentTarget.value)}
+            required
+          />
 
-          <div className="inline-grid two">
-            <label className="field">
-              <span>Preco</span>
-              <input
-                type="number"
-                min={1}
-                value={price}
-                onChange={(event) => setPrice(event.target.value)}
-                required
-              />
-            </label>
-            <label className="field">
-              <span>Tipo</span>
-              <select value={rentType} onChange={(event) => setRentType(event.target.value as RentType)}>
-                <option value="mensal">Mensal</option>
-                <option value="temporada">Temporada</option>
-                <option value="diaria">Diaria</option>
-              </select>
-            </label>
-          </div>
+          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+            <NumberInput
+              label="Preco"
+              min={1}
+              value={price}
+              onChange={(value) => setPrice(typeof value === 'number' ? value : '')}
+              required
+            />
+            <Select
+              label="Tipo"
+              data={[
+                { value: 'mensal', label: 'Mensal' },
+                { value: 'temporada', label: 'Temporada' },
+                { value: 'diaria', label: 'Diaria' },
+              ]}
+              value={rentType}
+              onChange={(value) => setRentType((value as RentType) || 'mensal')}
+            />
+          </SimpleGrid>
 
-          <div className="inline-grid three">
-            <label className="field">
-              <span>Quartos</span>
-              <input type="number" min={0} value={bedrooms} onChange={(e) => setBedrooms(Number(e.target.value))} />
-            </label>
-            <label className="field">
-              <span>Banheiros</span>
-              <input
-                type="number"
-                min={0}
-                value={bathrooms}
-                onChange={(event) => setBathrooms(Number(event.target.value))}
-              />
-            </label>
-            <label className="field">
-              <span>Garagem</span>
-              <input
-                type="number"
-                min={0}
-                value={garageSpots}
-                onChange={(event) => setGarageSpots(Number(event.target.value))}
-              />
-            </label>
-          </div>
+          <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
+            <NumberInput label="Quartos" min={0} value={bedrooms} onChange={(v) => setBedrooms(Number(v) || 0)} />
+            <NumberInput label="Banheiros" min={0} value={bathrooms} onChange={(v) => setBathrooms(Number(v) || 0)} />
+            <NumberInput label="Suites" min={0} value={suites} onChange={(v) => setSuites(Number(v) || 0)} />
+          </SimpleGrid>
 
-          <label className="check-line">
-            <input type="checkbox" checked={petFriendly} onChange={(event) => setPetFriendly(event.target.checked)} />
-            Aceita pet
-          </label>
+          <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
+            <NumberInput
+              label="Capacidade de hospedes"
+              min={1}
+              value={guestsCapacity}
+              onChange={(v) => setGuestsCapacity(Number(v) || 1)}
+            />
+            <NumberInput label="Garagem" min={0} value={garageSpots} onChange={(v) => setGarageSpots(Number(v) || 0)} />
+            <NumberInput label="Area (m2)" min={0} value={areaM2} onChange={(v) => setAreaM2(Number(v) || 0)} />
+          </SimpleGrid>
 
-          <label className="field">
-            <span>Endereco</span>
-            <input value={addressText} onChange={(event) => setAddressText(event.target.value)} required />
-          </label>
+          <Title order={4}>Comodidades</Title>
+          <MultiSelect
+            label="Comodidades"
+            placeholder="Selecione comodidades"
+            searchable
+            clearable
+            data={amenityOptions}
+            value={amenities}
+            onChange={setAmenities}
+          />
 
-          <div className="inline-grid two">
-            <label className="field">
-              <span>Latitude (opcional)</span>
-              <input value={latText} onChange={(event) => setLatText(event.target.value)} />
-            </label>
-            <label className="field">
-              <span>Longitude (opcional)</span>
-              <input value={lngText} onChange={(event) => setLngText(event.target.value)} />
-            </label>
-          </div>
+          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+            <Switch label="Aceita pet" checked={petFriendly} onChange={(event) => setPetFriendly(event.currentTarget.checked)} />
+            <Switch label="Imovel mobiliado" checked={furnished} onChange={(event) => setFurnished(event.currentTarget.checked)} />
+            <Switch
+              label="Permite fumar"
+              checked={smokingAllowed}
+              onChange={(event) => setSmokingAllowed(event.currentTarget.checked)}
+            />
+            <Switch
+              label="Permite eventos"
+              checked={eventsAllowed}
+              onChange={(event) => setEventsAllowed(event.currentTarget.checked)}
+            />
+          </SimpleGrid>
 
-          <label className="field">
-            <span>Adicionar fotos</span>
-            <input type="file" accept="image/*" multiple onChange={onAddPhotos} />
-          </label>
+          <Title order={4}>Politicas e taxas</Title>
+          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+            <NumberInput
+              label="Minimo de noites"
+              min={1}
+              value={minimumNights}
+              onChange={(v) => setMinimumNights(Number(v) || 1)}
+            />
+            <NumberInput
+              label="Taxa de limpeza"
+              min={0}
+              value={cleaningFee}
+              onChange={(v) => setCleaningFee(Number(v) || 0)}
+            />
+            <NumberInput
+              label="Caucao"
+              min={0}
+              value={securityDeposit}
+              onChange={(v) => setSecurityDeposit(Number(v) || 0)}
+            />
+            <SimpleGrid cols={2} spacing="xs">
+              <TextInput label="Check-in" type="time" value={checkInTime} onChange={(event) => setCheckInTime(event.currentTarget.value)} />
+              <TextInput label="Check-out" type="time" value={checkOutTime} onChange={(event) => setCheckOutTime(event.currentTarget.value)} />
+            </SimpleGrid>
+          </SimpleGrid>
 
-          <div className="photo-grid">
+          <Textarea
+            label="Regras da casa"
+            minRows={3}
+            value={houseRules}
+            onChange={(event) => setHouseRules(event.currentTarget.value)}
+          />
+
+          <Title order={4}>Localizacao</Title>
+          <TextInput label="Endereco" value={addressText} onChange={(event) => setAddressText(event.currentTarget.value)} required />
+
+          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+            <TextInput label="Latitude (opcional)" value={latText} onChange={(event) => setLatText(event.currentTarget.value)} />
+            <TextInput label="Longitude (opcional)" value={lngText} onChange={(event) => setLngText(event.currentTarget.value)} />
+          </SimpleGrid>
+
+          <Title order={4}>Fotos</Title>
+          <FileInput
+            label="Adicionar fotos"
+            placeholder="Selecione novas fotos"
+            multiple
+            accept="image/*"
+            leftSection={<ImagePlus size={16} />}
+            onChange={onAddPhotos}
+          />
+
+          <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="sm">
             {draftPhotos.map((photo, index) => (
-              <article className="photo-item" key={photo.id}>
-                <img src={photo.type === 'existing' ? photo.url : photo.previewUrl} alt={`Foto ${index + 1}`} />
-                <div className="photo-actions">
-                  {index === 0 ? (
-                    <span className="chip chip-soft">CAPA</span>
-                  ) : (
-                    <button type="button" className="btn btn-outline small" onClick={() => setAsCover(photo.id)}>
-                      Capa
-                    </button>
-                  )}
-                  <button type="button" className="btn btn-danger small" onClick={() => removePhoto(photo.id)}>
-                    Remover
-                  </button>
-                </div>
-              </article>
+              <Card key={photo.id} withBorder radius="lg" p="xs">
+                <Stack gap="xs">
+                  <img
+                    src={photo.type === 'existing' ? photo.url : photo.previewUrl}
+                    alt={`Foto ${index + 1}`}
+                    className="draft-photo"
+                  />
+                  <Group justify="space-between" wrap="nowrap">
+                    {index === 0 ? (
+                      <Badge color="ocean">CAPA</Badge>
+                    ) : (
+                      <Button variant="light" size="compact-sm" leftSection={<Star size={14} />} onClick={() => setAsCover(photo.id)}>
+                        Capa
+                      </Button>
+                    )}
+                    <ActionIcon color="red" variant="light" onClick={() => removePhoto(photo.id)}>
+                      <Trash2 size={14} />
+                    </ActionIcon>
+                  </Group>
+                </Stack>
+              </Card>
             ))}
-          </div>
+          </SimpleGrid>
 
-          {!hasMinimumPhotos && <p className="alert error">O anuncio precisa de no minimo 3 fotos.</p>}
-          {errorMessage && <p className="alert error">{errorMessage}</p>}
+          {!hasMinimumPhotos ? <Alert color="red">O anuncio precisa de no minimo 3 fotos.</Alert> : null}
+          {errorMessage ? <Alert color="red">{errorMessage}</Alert> : null}
 
-          <div className="inline-grid two">
-            <button className="btn btn-outline" type="button" onClick={() => navigate(-1)}>
+          <Group grow>
+            <Button variant="default" onClick={() => navigate(-1)}>
               Cancelar
-            </button>
-            <button className="btn btn-primary" type="submit" disabled={saving}>
-              {saving ? 'Salvando...' : 'Salvar alteracoes'}
-            </button>
-          </div>
-        </form>
-      </section>
-    </main>
+            </Button>
+            <Button loading={saving} onClick={() => void onSubmit()}>
+              Salvar alteracoes
+            </Button>
+          </Group>
+        </Stack>
+      </Card>
+    </Stack>
   );
 }
-

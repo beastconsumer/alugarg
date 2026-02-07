@@ -23,7 +23,20 @@ export interface Property {
   bedrooms: number;
   bathrooms: number;
   garage_spots: number;
+  guests_capacity: number;
+  suites: number;
+  area_m2: number;
   pet_friendly: boolean;
+  furnished: boolean;
+  smoking_allowed: boolean;
+  events_allowed: boolean;
+  amenities: string[];
+  house_rules: string;
+  check_in_time: string;
+  check_out_time: string;
+  minimum_nights: number;
+  cleaning_fee: number;
+  security_deposit: number;
   verified: boolean;
   status: PropertyStatus;
   photos: string[];
@@ -112,7 +125,20 @@ export const parseProperty = (raw: Record<string, unknown>): Property => ({
   bedrooms: Number(raw.bedrooms ?? 0),
   bathrooms: Number(raw.bathrooms ?? 0),
   garage_spots: Number(raw.garage_spots ?? 0),
+  guests_capacity: Number(raw.guests_capacity ?? 1),
+  suites: Number(raw.suites ?? 0),
+  area_m2: Number(raw.area_m2 ?? 0),
   pet_friendly: Boolean(raw.pet_friendly ?? false),
+  furnished: Boolean(raw.furnished ?? false),
+  smoking_allowed: Boolean(raw.smoking_allowed ?? false),
+  events_allowed: Boolean(raw.events_allowed ?? false),
+  amenities: Array.isArray(raw.amenities) ? raw.amenities.map((item) => String(item)) : [],
+  house_rules: String(raw.house_rules ?? ''),
+  check_in_time: String(raw.check_in_time ?? '14:00'),
+  check_out_time: String(raw.check_out_time ?? '11:00'),
+  minimum_nights: Number(raw.minimum_nights ?? 1),
+  cleaning_fee: Number(raw.cleaning_fee ?? 0),
+  security_deposit: Number(raw.security_deposit ?? 0),
   verified: Boolean(raw.verified ?? false),
   status: (String(raw.status ?? 'pending') as PropertyStatus),
   photos: Array.isArray(raw.photos) ? raw.photos.map((item) => String(item)) : [],

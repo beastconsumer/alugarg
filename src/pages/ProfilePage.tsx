@@ -1,5 +1,20 @@
-﻿import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import {
+  Alert,
+  Avatar,
+  Badge,
+  Button,
+  Card,
+  Group,
+  Select,
+  SimpleGrid,
+  Stack,
+  Text,
+  TextInput,
+  Textarea,
+  Title,
+} from '@mantine/core';
 import { Upload } from 'lucide-react';
 import { useAuth } from '../state/AuthContext';
 import { formatDate, formatMoney } from '../lib/format';
@@ -14,14 +29,7 @@ import {
   statusLabel,
 } from '../lib/types';
 
-const reviewTags = [
-  'Pontual',
-  'Comunicacao boa',
-  'Imovel limpo',
-  'Confiavel',
-  'Recomendo',
-  'Check-in facil',
-];
+const reviewTags = ['Pontual', 'Comunicacao boa', 'Imovel limpo', 'Confiavel', 'Recomendo', 'Check-in facil'];
 
 export function ProfilePage() {
   const { user, profile, refreshProfile, signOut } = useAuth();
@@ -53,52 +61,23 @@ export function ProfilePage() {
   }, [profile]);
 
   const loadData = async () => {
-    if (!user) {
-      return;
-    }
+    if (!user) return;
 
     setLoadingData(true);
     setErrorMessage('');
 
     try {
       const [propertiesRes, bookingsRes, givenReviewsRes, receivedReviewsRes] = await Promise.all([
-        supabase
-          .from('properties')
-          .select('*')
-          .eq('owner_id', user.id)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('bookings')
-          .select('*')
-          .eq('renter_id', user.id)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('owner_reviews')
-          .select('*')
-          .eq('renter_id', user.id)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('owner_reviews')
-          .select('*')
-          .eq('owner_id', user.id)
-          .order('created_at', { ascending: false }),
+        supabase.from('properties').select('*').eq('owner_id', user.id).order('created_at', { ascending: false }),
+        supabase.from('bookings').select('*').eq('renter_id', user.id).order('created_at', { ascending: false }),
+        supabase.from('owner_reviews').select('*').eq('renter_id', user.id).order('created_at', { ascending: false }),
+        supabase.from('owner_reviews').select('*').eq('owner_id', user.id).order('created_at', { ascending: false }),
       ]);
 
-      if (propertiesRes.error) {
-        throw propertiesRes.error;
-      }
-
-      if (bookingsRes.error) {
-        throw bookingsRes.error;
-      }
-
-      if (givenReviewsRes.error) {
-        throw givenReviewsRes.error;
-      }
-
-      if (receivedReviewsRes.error) {
-        throw receivedReviewsRes.error;
-      }
+      if (propertiesRes.error) throw propertiesRes.error;
+      if (bookingsRes.error) throw bookingsRes.error;
+      if (givenReviewsRes.error) throw givenReviewsRes.error;
+      if (receivedReviewsRes.error) throw receivedReviewsRes.error;
 
       setMyProperties((propertiesRes.data ?? []).map((row) => parseProperty(row)));
       setMyBookings((bookingsRes.data ?? []).map((row) => parseBooking(row)));
@@ -117,17 +96,12 @@ export function ProfilePage() {
 
   const pendingReviewBookings = useMemo(() => {
     const reviewedBookingIds = new Set(reviewsGiven.map((review) => review.booking_id));
-    return myBookings.filter(
-      (booking) => booking.status === 'checked_out' && !reviewedBookingIds.has(booking.id),
-    );
+    return myBookings.filter((booking) => booking.status === 'checked_out' && !reviewedBookingIds.has(booking.id));
   }, [myBookings, reviewsGiven]);
 
   const onSaveProfile = async (event: FormEvent) => {
     event.preventDefault();
-
-    if (!user) {
-      return;
-    }
+    if (!user) return;
 
     setSavingProfile(true);
     setErrorMessage('');
@@ -143,10 +117,7 @@ export function ProfilePage() {
         })
         .eq('id', user.id);
 
-      if (error) {
-        throw error;
-      }
-
+      if (error) throw error;
       await refreshProfile();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Falha ao salvar perfil');
@@ -156,14 +127,10 @@ export function ProfilePage() {
   };
 
   const onAvatarSelected = async (event: ChangeEvent<HTMLInputElement>) => {
-    if (!user) {
-      return;
-    }
+    if (!user) return;
 
     const file = event.target.files?.[0];
-    if (!file) {
-      return;
-    }
+    if (!file) return;
 
     setAvatarUploading(true);
     setErrorMessage('');
@@ -173,9 +140,7 @@ export function ProfilePage() {
       const url = await uploadImageAndGetPublicUrl(file, path);
 
       const { error } = await supabase.from('users').update({ avatar_url: url }).eq('id', user.id);
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       await refreshProfile();
     } catch (error) {
@@ -195,9 +160,7 @@ export function ProfilePage() {
   const submitReview = async (event: FormEvent) => {
     event.preventDefault();
 
-    if (!user || !reviewBookingId) {
-      return;
-    }
+    if (!user || !reviewBookingId) return;
 
     const booking = myBookings.find((item) => item.id === reviewBookingId);
     if (!booking) {
@@ -216,9 +179,7 @@ export function ProfilePage() {
         comment: reviewComment.trim(),
       });
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       setReviewBookingId('');
       setReviewComment('');
@@ -231,194 +192,202 @@ export function ProfilePage() {
   };
 
   return (
-    <main className="screen content-page">
-      <header className="page-header">
-        <h1>Perfil</h1>
-      </header>
+    <Stack gap="md" py="md" pb={96}>
+      <Card withBorder radius="xl" p="lg">
+        <Stack gap="xs">
+          <Title order={2}>Perfil</Title>
+          <Text c="dimmed">Gerencie seus dados, anuncios, reservas e avaliacoes.</Text>
+        </Stack>
+      </Card>
 
-      {errorMessage && <p className="alert error">{errorMessage}</p>}
+      {errorMessage ? <Alert color="red">{errorMessage}</Alert> : null}
 
-      <section className="card stack gap-12">
-        <div className="profile-top">
-          <img
-            className="avatar"
-            src={profile?.avatar_url || '/logoapp.png'}
-            alt={profile?.name || 'Avatar do usuario'}
-          />
-
-          <label className="btn btn-outline small" aria-label="Subir avatar">
-            <Upload size={14} /> {avatarUploading ? 'Enviando...' : 'Alterar foto'}
-            <input type="file" accept="image/*" onChange={onAvatarSelected} hidden />
-          </label>
-        </div>
-
-        <form className="stack gap-12" onSubmit={onSaveProfile}>
-          <label className="field">
-            <span>Nome</span>
-            <input value={name} onChange={(event) => setName(event.target.value)} required />
-          </label>
-          <label className="field">
-            <span>Telefone</span>
-            <input value={phone} onChange={(event) => setPhone(event.target.value)} required />
-          </label>
-          <label className="field">
-            <span>CPF</span>
-            <input value={cpf} onChange={(event) => setCpf(event.target.value)} />
-          </label>
-          <label className="field">
-            <span>Email (login)</span>
-            <input value={profile?.email || ''} readOnly />
-          </label>
-          <label className="field">
-            <span>Data nascimento (YYYY-MM-DD)</span>
-            <input value={birthDate} onChange={(event) => setBirthDate(event.target.value)} />
-          </label>
-
-          <button className="btn btn-primary" type="submit" disabled={savingProfile}>
-            {savingProfile ? 'Salvando...' : 'Salvar perfil'}
-          </button>
-        </form>
-
-        {profile?.role === 'admin' && (
-          <a className="btn btn-outline" href="/admin.html" target="_blank" rel="noreferrer">
-            Abrir painel admin web
-          </a>
-        )}
-
-        <button className="btn btn-danger" onClick={() => void signOut()}>
-          Sair
-        </button>
-      </section>
-
-      <section className="card stack gap-12">
-        <h2>Meus anuncios</h2>
-
-        {loadingData && <p className="muted">Carregando...</p>}
-
-        {myProperties.map((property) => (
-          <article key={property.id} className="listing-row">
-            <div>
-              <h3>{property.title}</h3>
-              <p className="muted">{property.location.addressText || 'Sem endereco'}</p>
-              <p>
-                {formatMoney(property.price)} - {statusLabel[property.status]}
-              </p>
-            </div>
-
-            <div className="inline-grid two">
-              <Link className="btn btn-outline small" to={`/app/property/${property.id}`}>
-                Ver
-              </Link>
-              <Link className="btn btn-primary small" to={`/app/edit-property/${property.id}`}>
-                Editar
-              </Link>
-            </div>
-          </article>
-        ))}
-      </section>
-
-      <section className="card stack gap-12">
-        <h2>Casas alugadas por voce</h2>
-
-        {myBookings.length === 0 && <p className="muted">Nenhuma reserva ainda.</p>}
-
-        {myBookings.map((booking) => (
-          <article key={booking.id} className="booking-card">
-            <div>
-              <h3>{booking.property_title}</h3>
-              <p className="muted">
-                {formatDate(booking.check_in_date)} ate {formatDate(booking.check_out_date)}
-              </p>
-              <p>Total: {formatMoney(booking.total_paid_by_renter)}</p>
-              <p>Status: {booking.status}</p>
-            </div>
-          </article>
-        ))}
-      </section>
-
-      <section className="card stack gap-12">
-        <h2>Avaliar proprietario (apos check-out)</h2>
-
-        {pendingReviewBookings.length === 0 && (
-          <p className="muted">Sem locacoes finalizadas pendentes de avaliacao.</p>
-        )}
-
-        {pendingReviewBookings.length > 0 && (
-          <form className="stack gap-12" onSubmit={submitReview}>
-            <label className="field">
-              <span>Reserva</span>
-              <select value={reviewBookingId} onChange={(event) => setReviewBookingId(event.target.value)} required>
-                <option value="">Selecione</option>
-                {pendingReviewBookings.map((booking) => (
-                  <option key={booking.id} value={booking.id}>
-                    {booking.property_title} - {formatDate(booking.check_out_date)}
-                  </option>
-                ))}
-              </select>
+      <Card withBorder radius="xl" p="lg">
+        <Stack gap="md">
+          <Group>
+            <Avatar src={profile?.avatar_url || '/logoapp.png'} size={72} radius="xl" />
+            <label>
+              <Button component="span" variant="light" leftSection={<Upload size={16} />} loading={avatarUploading}>
+                Alterar foto
+              </Button>
+              <input type="file" accept="image/*" onChange={onAvatarSelected} hidden />
             </label>
+          </Group>
 
-            <label className="field">
-              <span>Nota (1 a 5)</span>
-              <input
-                type="number"
-                min={1}
-                max={5}
-                value={reviewRating}
-                onChange={(event) => setReviewRating(Number(event.target.value))}
-              />
-            </label>
+          <form onSubmit={onSaveProfile}>
+            <Stack gap="md">
+              <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+                <TextInput label="Nome" value={name} onChange={(event) => setName(event.currentTarget.value)} required />
+                <TextInput label="Telefone" value={phone} onChange={(event) => setPhone(event.currentTarget.value)} required />
+              </SimpleGrid>
 
-            <div className="chips-row">
-              {reviewTags.map((tag) => (
-                <button
-                  key={tag}
-                  type="button"
-                  className={`chip-action ${reviewTagsSelected.includes(tag) ? 'active' : ''}`}
-                  onClick={() => toggleTag(tag)}
-                >
-                  {tag}
-                </button>
-              ))}
-            </div>
+              <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+                <TextInput label="CPF" value={cpf} onChange={(event) => setCpf(event.currentTarget.value)} />
+                <TextInput label="Data nascimento (YYYY-MM-DD)" value={birthDate} onChange={(event) => setBirthDate(event.currentTarget.value)} />
+              </SimpleGrid>
 
-            <label className="field">
-              <span>Comentario</span>
-              <textarea
-                value={reviewComment}
-                onChange={(event) => setReviewComment(event.target.value)}
-                rows={3}
-              />
-            </label>
+              <TextInput label="Email (login)" value={profile?.email || ''} readOnly />
 
-            <button className="btn btn-primary" type="submit">
-              Enviar avaliacao
-            </button>
+              <Group grow>
+                <Button type="submit" loading={savingProfile}>
+                  Salvar perfil
+                </Button>
+                <Button color="red" variant="light" onClick={() => void signOut()}>
+                  Sair
+                </Button>
+              </Group>
+            </Stack>
           </form>
-        )}
-      </section>
 
-      <section className="card stack gap-12">
-        <h2>Tags e avaliacoes recebidas como proprietario</h2>
+          {profile?.role === 'admin' ? (
+            <Button component="a" href="/admin.html" target="_blank" rel="noreferrer" variant="default">
+              Abrir painel admin web
+            </Button>
+          ) : null}
+        </Stack>
+      </Card>
 
-        {receivedReviews.length === 0 && <p className="muted">Nenhuma avaliacao recebida ainda.</p>}
+      <Card withBorder radius="xl" p="lg">
+        <Stack gap="md">
+          <Title order={3}>Meus anuncios</Title>
+          {loadingData ? <Text c="dimmed">Carregando...</Text> : null}
+          {myProperties.length === 0 ? <Text c="dimmed">Sem anuncios ainda.</Text> : null}
 
-        {receivedReviews.map((review) => (
-          <article key={review.id} className="booking-card">
-            <div>
-              <p>Nota: {review.rating}/5</p>
-              <p className="muted">{review.comment || 'Sem comentario'}</p>
-              <div className="chips-row">
-                {review.tags.map((tag) => (
-                  <span key={tag} className="chip chip-soft">
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </article>
-        ))}
-      </section>
-    </main>
+          {myProperties.map((property) => (
+            <Card key={property.id} withBorder radius="lg" p="md">
+              <Group justify="space-between" align="flex-start">
+                <div>
+                  <Text fw={700}>{property.title}</Text>
+                  <Text size="sm" c="dimmed">
+                    {property.location.addressText || 'Sem endereco'}
+                  </Text>
+                  <Text size="sm">
+                    {formatMoney(property.price)} - {statusLabel[property.status]}
+                  </Text>
+                </div>
+
+                <Group>
+                  <Button component={Link} to={`/app/property/${property.id}`} variant="default" size="xs">
+                    Ver
+                  </Button>
+                  <Button component={Link} to={`/app/edit-property/${property.id}`} size="xs">
+                    Editar
+                  </Button>
+                </Group>
+              </Group>
+            </Card>
+          ))}
+        </Stack>
+      </Card>
+
+      <Card withBorder radius="xl" p="lg">
+        <Stack gap="md">
+          <Title order={3}>Casas alugadas por voce</Title>
+          {myBookings.length === 0 ? <Text c="dimmed">Nenhuma reserva ainda.</Text> : null}
+
+          {myBookings.map((booking) => (
+            <Card key={booking.id} withBorder radius="lg" p="md">
+              <Stack gap={4}>
+                <Text fw={700}>{booking.property_title}</Text>
+                <Text size="sm" c="dimmed">
+                  {formatDate(booking.check_in_date)} ate {formatDate(booking.check_out_date)}
+                </Text>
+                <Text size="sm">Total: {formatMoney(booking.total_paid_by_renter)}</Text>
+                <Badge variant="light">Status: {booking.status}</Badge>
+              </Stack>
+            </Card>
+          ))}
+        </Stack>
+      </Card>
+
+      <Card withBorder radius="xl" p="lg">
+        <Stack gap="md">
+          <Title order={3}>Avaliar proprietario (apos check-out)</Title>
+
+          {pendingReviewBookings.length === 0 ? (
+            <Text c="dimmed">Sem locacoes finalizadas pendentes de avaliacao.</Text>
+          ) : (
+            <form onSubmit={submitReview}>
+              <Stack gap="md">
+                <Select
+                  label="Reserva"
+                  data={pendingReviewBookings.map((booking) => ({
+                    value: booking.id,
+                    label: `${booking.property_title} - ${formatDate(booking.check_out_date)}`,
+                  }))}
+                  value={reviewBookingId}
+                  onChange={(value) => setReviewBookingId(value || '')}
+                  required
+                />
+
+                <Select
+                  label="Nota"
+                  data={[
+                    { value: '1', label: '1' },
+                    { value: '2', label: '2' },
+                    { value: '3', label: '3' },
+                    { value: '4', label: '4' },
+                    { value: '5', label: '5' },
+                  ]}
+                  value={String(reviewRating)}
+                  onChange={(value) => setReviewRating(Number(value || 5))}
+                  required
+                />
+
+                <Group gap="xs" wrap="wrap">
+                  {reviewTags.map((tag) => (
+                    <Badge
+                      key={tag}
+                      size="lg"
+                      className="clickable-badge"
+                      variant={reviewTagsSelected.includes(tag) ? 'filled' : 'light'}
+                      color={reviewTagsSelected.includes(tag) ? 'ocean' : 'gray'}
+                      onClick={() => toggleTag(tag)}
+                    >
+                      {tag}
+                    </Badge>
+                  ))}
+                </Group>
+
+                <Textarea
+                  label="Comentario"
+                  minRows={3}
+                  value={reviewComment}
+                  onChange={(event) => setReviewComment(event.currentTarget.value)}
+                />
+
+                <Button type="submit">Enviar avaliacao</Button>
+              </Stack>
+            </form>
+          )}
+        </Stack>
+      </Card>
+
+      <Card withBorder radius="xl" p="lg">
+        <Stack gap="md">
+          <Title order={3}>Avaliacoes recebidas como proprietario</Title>
+
+          {receivedReviews.length === 0 ? <Text c="dimmed">Nenhuma avaliacao recebida ainda.</Text> : null}
+
+          {receivedReviews.map((review) => (
+            <Card key={review.id} withBorder radius="lg" p="md">
+              <Stack gap={6}>
+                <Text fw={700}>Nota: {review.rating}/5</Text>
+                <Text size="sm" c="dimmed">
+                  {review.comment || 'Sem comentario'}
+                </Text>
+                <Group gap="xs" wrap="wrap">
+                  {review.tags.map((tag) => (
+                    <Badge key={tag} variant="light" color="teal">
+                      {tag}
+                    </Badge>
+                  ))}
+                </Group>
+              </Stack>
+            </Card>
+          ))}
+        </Stack>
+      </Card>
+    </Stack>
   );
 }
-

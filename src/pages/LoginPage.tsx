@@ -1,5 +1,19 @@
-﻿import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import {
+  Alert,
+  Anchor,
+  Box,
+  Button,
+  Container,
+  Paper,
+  PasswordInput,
+  Stack,
+  Text,
+  TextInput,
+  Title,
+} from '@mantine/core';
+import { AlertCircle, LogIn } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { normalizePhone } from '../lib/phone';
 
@@ -30,13 +44,8 @@ export function LoginPage() {
           p_phone: normalizePhone(identifier),
         });
 
-        if (error) {
-          throw error;
-        }
-
-        if (!data) {
-          throw new Error('Telefone nao encontrado. Cadastre-se primeiro.');
-        }
+        if (error) throw error;
+        if (!data) throw new Error('Telefone nao encontrado. Cadastre-se primeiro.');
 
         email = String(data);
       }
@@ -46,60 +55,80 @@ export function LoginPage() {
         password,
       });
 
-      if (signInError) {
-        throw signInError;
-      }
+      if (signInError) throw signInError;
 
       navigate('/app/home', { replace: true });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Falha ao entrar';
-      setErrorMessage(message);
+      setErrorMessage(error instanceof Error ? error.message : 'Falha ao entrar');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <main className="screen auth-screen">
-      <section className="card auth-form-card">
-        <h1>Entrar</h1>
-        <p className="muted">Use email ou telefone + senha.</p>
+    <Box className="auth-screen-shell">
+      <Container size="xs" py={48}>
+        <Paper withBorder radius="xl" shadow="lg" p="xl">
+          <Stack gap="lg">
+            <Stack gap={4}>
+              <Title order={2}>Entrar</Title>
+              <Text c="dimmed" size="sm">
+                Use email ou telefone com senha.
+              </Text>
+            </Stack>
 
-        <form className="stack gap-12" onSubmit={onSubmit}>
-          <label className="field">
-            <span>Email ou telefone</span>
-            <input
-              value={identifier}
-              onChange={(event) => setIdentifier(event.target.value)}
-              placeholder="email@dominio.com ou +5553..."
-              required
-            />
-          </label>
+            <form onSubmit={onSubmit}>
+              <Stack gap="md">
+                <TextInput
+                  label="Email ou telefone"
+                  placeholder="email@dominio.com ou +5553999005952"
+                  value={identifier}
+                  onChange={(event) => setIdentifier(event.currentTarget.value)}
+                  required
+                />
 
-          <label className="field">
-            <span>Senha</span>
-            <input
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              type="password"
-              placeholder="Sua senha"
-              required
-            />
-          </label>
+                <PasswordInput
+                  label="Senha"
+                  placeholder="Sua senha"
+                  value={password}
+                  onChange={(event) => setPassword(event.currentTarget.value)}
+                  required
+                />
 
-          {noticeMessage && <p className="alert success">{noticeMessage}</p>}
-          {errorMessage && <p className="alert error">{errorMessage}</p>}
+                {noticeMessage ? (
+                  <Alert color="green" variant="light">
+                    {noticeMessage}
+                  </Alert>
+                ) : null}
 
-          <button className="btn btn-primary" type="submit" disabled={loading}>
-            {loading ? 'Entrando...' : 'Entrar'}
-          </button>
-        </form>
+                {errorMessage ? (
+                  <Alert color="red" variant="light" icon={<AlertCircle size={16} />}>
+                    {errorMessage}
+                  </Alert>
+                ) : null}
 
-        <p className="muted">
-          Nao tem conta? <Link to="/signup">Criar conta</Link>
-        </p>
-      </section>
-    </main>
+                <Button
+                  type="submit"
+                  loading={loading}
+                  leftSection={<LogIn size={16} />}
+                  variant="gradient"
+                  gradient={{ from: 'ocean.6', to: 'ocean.4', deg: 120 }}
+                  fullWidth
+                >
+                  Entrar
+                </Button>
+              </Stack>
+            </form>
+
+            <Text c="dimmed" size="sm" ta="center">
+              Nao tem conta?{' '}
+              <Anchor component={Link} to="/signup" fw={700}>
+                Criar conta
+              </Anchor>
+            </Text>
+          </Stack>
+        </Paper>
+      </Container>
+    </Box>
   );
 }
-

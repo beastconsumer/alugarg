@@ -109,7 +109,7 @@ if (-not $hasEmulator) {
 }
 
 $cmd = @(
-  "cd /d $PSScriptRoot",
+  ('cd /d "{0}"' -f $PSScriptRoot),
   ('set "VITE_SUPABASE_URL={0}"' -f $SupabaseUrl),
   ('set "VITE_SUPABASE_ANON_KEY={0}"' -f $SupabaseAnonKey),
   ('set "VITE_SUPABASE_BUCKET={0}"' -f $SupabaseBucket),

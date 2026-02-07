@@ -1,4 +1,6 @@
-﻿import { ReactNode } from 'react';
+import { ReactNode } from 'react';
+import { Alert, Button, Center, Paper, Stack, Text, Title } from '@mantine/core';
+import { AlertCircle } from 'lucide-react';
 
 export function ErrorScreen({
   title,
@@ -10,13 +12,16 @@ export function ErrorScreen({
   action?: ReactNode;
 }) {
   return (
-    <main className="screen center-screen">
-      <section className="card narrow-card">
-        <h1>{title}</h1>
-        <p className="muted">{message}</p>
-        {action}
-      </section>
-    </main>
+    <Center mih="100dvh" p="md">
+      <Paper withBorder radius="xl" shadow="md" p="xl" maw={560} w="100%">
+        <Stack gap="md">
+          <Title order={2}>{title}</Title>
+          <Alert color="red" variant="light" icon={<AlertCircle size={16} />}>
+            <Text size="sm">{message}</Text>
+          </Alert>
+          {action ?? <Button component="a" href="/">Voltar ao inicio</Button>}
+        </Stack>
+      </Paper>
+    </Center>
   );
 }
-

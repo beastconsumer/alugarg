@@ -1,8 +1,30 @@
-﻿import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  ActionIcon,
+  Alert,
+  Badge,
+  Button,
+  Card,
+  FileInput,
+  Group,
+  MultiSelect,
+  NumberInput,
+  Select,
+  SimpleGrid,
+  Stack,
+  Stepper,
+  Switch,
+  Text,
+  TextInput,
+  Textarea,
+  Title,
+} from '@mantine/core';
+import { ImagePlus, Star, Trash2 } from 'lucide-react';
 import { useAuth } from '../state/AuthContext';
 import { env } from '../env';
 import { uploadImageAndGetPublicUrl, supabase } from '../lib/supabase';
+import { amenityOptions } from '../lib/propertyCatalog';
 import { RentType } from '../lib/types';
 
 interface DraftPhoto {
@@ -11,8 +33,8 @@ interface DraftPhoto {
   previewUrl: string;
 }
 
-const createPhotoDrafts = (files: FileList): DraftPhoto[] =>
-  Array.from(files).map((file) => ({
+const createPhotoDrafts = (files: File[]): DraftPhoto[] =>
+  files.map((file) => ({
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
     file,
     previewUrl: URL.createObjectURL(file),
@@ -28,12 +50,25 @@ export function AnnouncePage() {
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [price, setPrice] = useState('');
+  const [price, setPrice] = useState<number | ''>('');
   const [rentType, setRentType] = useState<RentType>('mensal');
   const [bedrooms, setBedrooms] = useState(1);
   const [bathrooms, setBathrooms] = useState(1);
   const [garageSpots, setGarageSpots] = useState(0);
+  const [guestsCapacity, setGuestsCapacity] = useState(2);
+  const [suites, setSuites] = useState(0);
+  const [areaM2, setAreaM2] = useState(0);
+  const [minimumNights, setMinimumNights] = useState(1);
+  const [checkInTime, setCheckInTime] = useState('14:00');
+  const [checkOutTime, setCheckOutTime] = useState('11:00');
+  const [cleaningFee, setCleaningFee] = useState(0);
+  const [securityDeposit, setSecurityDeposit] = useState(0);
   const [petFriendly, setPetFriendly] = useState(false);
+  const [furnished, setFurnished] = useState(true);
+  const [smokingAllowed, setSmokingAllowed] = useState(false);
+  const [eventsAllowed, setEventsAllowed] = useState(false);
+  const [amenities, setAmenities] = useState<string[]>([]);
+  const [houseRules, setHouseRules] = useState('');
 
   const [addressText, setAddressText] = useState('');
   const [latText, setLatText] = useState('');
@@ -47,23 +82,16 @@ export function AnnouncePage() {
     };
   }, [photos]);
 
-  const onSelectPhotos = (event: ChangeEvent<HTMLInputElement>) => {
-    const fileList = event.target.files;
-    if (!fileList || fileList.length === 0) {
-      return;
-    }
-
-    const drafts = createPhotoDrafts(fileList);
+  const onSelectPhotos = (files: File[] | null) => {
+    if (!files || files.length === 0) return;
+    const drafts = createPhotoDrafts(files);
     setPhotos((current) => [...current, ...drafts]);
-    event.target.value = '';
   };
 
   const removePhoto = (id: string) => {
     setPhotos((current) => {
       const target = current.find((photo) => photo.id === id);
-      if (target) {
-        URL.revokeObjectURL(target.previewUrl);
-      }
+      if (target) URL.revokeObjectURL(target.previewUrl);
       return current.filter((photo) => photo.id !== id);
     });
   };
@@ -71,9 +99,7 @@ export function AnnouncePage() {
   const setCoverPhoto = (id: string) => {
     setPhotos((current) => {
       const idx = current.findIndex((photo) => photo.id === id);
-      if (idx < 0) {
-        return current;
-      }
+      if (idx < 0) return current;
       const clone = [...current];
       const [selected] = clone.splice(idx, 1);
       clone.unshift(selected);
@@ -83,17 +109,23 @@ export function AnnouncePage() {
 
   const canGoNext = useMemo(() => {
     if (step === 0) {
-      return title.trim().length > 2 && Number(price) > 0 && description.trim().length > 10;
+      return (
+        title.trim().length > 3 &&
+        Number(price) > 0 &&
+        description.trim().length > 10 &&
+        guestsCapacity >= 1 &&
+        minimumNights >= 1
+      );
     }
+
     if (step === 1) {
       return addressText.trim().length > 5;
     }
+
     return true;
-  }, [addressText, description, price, step, title]);
+  }, [addressText, description, guestsCapacity, minimumNights, price, step, title]);
 
-  const publishProperty = async (event: FormEvent) => {
-    event.preventDefault();
-
+  const publishProperty = async () => {
     if (!user) {
       setErrorMessage('Sessao expirada. Entre novamente.');
       return;
@@ -128,7 +160,20 @@ export function AnnouncePage() {
         bedrooms,
         bathrooms,
         garage_spots: garageSpots,
+        guests_capacity: guestsCapacity,
+        suites,
+        area_m2: areaM2,
+        minimum_nights: minimumNights,
+        check_in_time: checkInTime,
+        check_out_time: checkOutTime,
+        cleaning_fee: cleaningFee,
+        security_deposit: securityDeposit,
         pet_friendly: petFriendly,
+        furnished,
+        smoking_allowed: smokingAllowed,
+        events_allowed: eventsAllowed,
+        amenities,
+        house_rules: houseRules.trim(),
         verified: false,
         status: 'pending',
         photos: uploadedUrls,
@@ -139,17 +184,12 @@ export function AnnouncePage() {
         },
       });
 
-      if (error) {
-        throw error;
-      }
-
+      if (error) throw error;
       navigate('/app/profile', { replace: true });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Falha ao publicar anuncio';
       if (message.toLowerCase().includes('bucket')) {
-        setErrorMessage(
-          `Bucket ${env.supabaseBucket} nao encontrado. Crie o bucket no Supabase Storage.`,
-        );
+        setErrorMessage(`Bucket ${env.supabaseBucket} nao encontrado. Crie no Supabase Storage.`);
       } else {
         setErrorMessage(message);
       }
@@ -159,200 +199,245 @@ export function AnnouncePage() {
   };
 
   return (
-    <main className="screen content-page">
-      <header className="page-header">
-        <div>
-          <h1>Anunciar imovel</h1>
-          <p className="muted">Wizard em 3 etapas com moderacao automatica.</p>
-        </div>
-      </header>
+    <Stack gap="md" py="md" pb={96}>
+      <Card withBorder radius="xl" p="lg">
+        <Stack gap={6}>
+          <Title order={2}>Anunciar imovel</Title>
+          <Text c="dimmed">Fluxo profissional com comodidades, regras e taxas completas.</Text>
+        </Stack>
+      </Card>
 
-      <section className="card">
-        <div className="wizard-steps">
-          <span className={step === 0 ? 'active' : ''}>1. Info</span>
-          <span className={step === 1 ? 'active' : ''}>2. Local</span>
-          <span className={step === 2 ? 'active' : ''}>3. Fotos</span>
-        </div>
+      <Card withBorder radius="xl" p="lg">
+        <Stack gap="lg">
+          <Stepper active={step} onStepClick={setStep} allowNextStepsSelect iconPosition="left">
+            <Stepper.Step label="Info" description="Estrutura e politicas" />
+            <Stepper.Step label="Local" description="Endereco e referencia" />
+            <Stepper.Step label="Fotos" description="Galeria do anuncio" />
+          </Stepper>
 
-        <form className="stack gap-16" onSubmit={publishProperty}>
-          {step === 0 && (
-            <>
-              <label className="field">
-                <span>Titulo</span>
-                <input value={title} onChange={(event) => setTitle(event.target.value)} required />
-              </label>
+          {step === 0 ? (
+            <Stack gap="md">
+              <Title order={4}>Dados principais</Title>
+              <TextInput label="Titulo" value={title} onChange={(e) => setTitle(e.currentTarget.value)} required />
+              <Textarea
+                label="Descricao"
+                minRows={4}
+                value={description}
+                onChange={(e) => setDescription(e.currentTarget.value)}
+                required
+              />
 
-              <label className="field">
-                <span>Descricao</span>
-                <textarea
-                  rows={4}
-                  value={description}
-                  onChange={(event) => setDescription(event.target.value)}
+              <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+                <NumberInput
+                  label="Preco base"
+                  min={1}
+                  value={price}
+                  onChange={(value) => setPrice(typeof value === 'number' ? value : '')}
                   required
                 />
-              </label>
+                <Select
+                  label="Tipo de aluguel"
+                  data={[
+                    { value: 'mensal', label: 'Mensal' },
+                    { value: 'temporada', label: 'Temporada' },
+                    { value: 'diaria', label: 'Diaria' },
+                  ]}
+                  value={rentType}
+                  onChange={(value) => setRentType((value as RentType) || 'mensal')}
+                />
+              </SimpleGrid>
 
-              <div className="inline-grid two">
-                <label className="field">
-                  <span>Preco</span>
-                  <input
-                    type="number"
-                    min={1}
-                    value={price}
-                    onChange={(event) => setPrice(event.target.value)}
-                    required
-                  />
-                </label>
+              <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
+                <NumberInput label="Quartos" min={0} value={bedrooms} onChange={(v) => setBedrooms(Number(v) || 0)} />
+                <NumberInput label="Banheiros" min={0} value={bathrooms} onChange={(v) => setBathrooms(Number(v) || 0)} />
+                <NumberInput label="Suites" min={0} value={suites} onChange={(v) => setSuites(Number(v) || 0)} />
+              </SimpleGrid>
 
-                <label className="field">
-                  <span>Tipo de aluguel</span>
-                  <select value={rentType} onChange={(event) => setRentType(event.target.value as RentType)}>
-                    <option value="mensal">Mensal</option>
-                    <option value="temporada">Temporada</option>
-                    <option value="diaria">Diaria</option>
-                  </select>
-                </label>
-              </div>
+              <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
+                <NumberInput
+                  label="Capacidade de hospedes"
+                  min={1}
+                  value={guestsCapacity}
+                  onChange={(v) => setGuestsCapacity(Number(v) || 1)}
+                />
+                <NumberInput
+                  label="Vagas de garagem"
+                  min={0}
+                  value={garageSpots}
+                  onChange={(v) => setGarageSpots(Number(v) || 0)}
+                />
+                <NumberInput label="Area (m2)" min={0} value={areaM2} onChange={(v) => setAreaM2(Number(v) || 0)} />
+              </SimpleGrid>
 
-              <div className="inline-grid three">
-                <label className="field">
-                  <span>Quartos</span>
-                  <input
-                    type="number"
-                    min={0}
-                    value={bedrooms}
-                    onChange={(event) => setBedrooms(Number(event.target.value))}
-                  />
-                </label>
+              <Title order={4}>Comodidades estilo hospedagem premium</Title>
+              <MultiSelect
+                label="Comodidades"
+                placeholder="Selecione comodidades"
+                searchable
+                clearable
+                data={amenityOptions}
+                value={amenities}
+                onChange={setAmenities}
+              />
 
-                <label className="field">
-                  <span>Banheiros</span>
-                  <input
-                    type="number"
-                    min={0}
-                    value={bathrooms}
-                    onChange={(event) => setBathrooms(Number(event.target.value))}
-                  />
-                </label>
-
-                <label className="field">
-                  <span>Vagas de garagem</span>
-                  <input
-                    type="number"
-                    min={0}
-                    value={garageSpots}
-                    onChange={(event) => setGarageSpots(Number(event.target.value))}
-                  />
-                </label>
-              </div>
-
-              <label className="check-line">
-                <input
-                  type="checkbox"
+              <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+                <Switch
+                  label="Aceita pet"
                   checked={petFriendly}
-                  onChange={(event) => setPetFriendly(event.target.checked)}
+                  onChange={(event) => setPetFriendly(event.currentTarget.checked)}
                 />
-                Aceita pet
-              </label>
-            </>
-          )}
-
-          {step === 1 && (
-            <>
-              <label className="field">
-                <span>Endereco de referencia</span>
-                <input
-                  value={addressText}
-                  onChange={(event) => setAddressText(event.target.value)}
-                  placeholder="Rua, numero, bairro"
-                  required
+                <Switch
+                  label="Imovel mobiliado"
+                  checked={furnished}
+                  onChange={(event) => setFurnished(event.currentTarget.checked)}
                 />
-              </label>
+                <Switch
+                  label="Permite fumar"
+                  checked={smokingAllowed}
+                  onChange={(event) => setSmokingAllowed(event.currentTarget.checked)}
+                />
+                <Switch
+                  label="Permite eventos"
+                  checked={eventsAllowed}
+                  onChange={(event) => setEventsAllowed(event.currentTarget.checked)}
+                />
+              </SimpleGrid>
 
-              <div className="inline-grid two">
-                <label className="field">
-                  <span>Latitude (opcional)</span>
-                  <input value={latText} onChange={(event) => setLatText(event.target.value)} />
-                </label>
-                <label className="field">
-                  <span>Longitude (opcional)</span>
-                  <input value={lngText} onChange={(event) => setLngText(event.target.value)} />
-                </label>
-              </div>
+              <Title order={4}>Politicas e taxas</Title>
+              <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+                <NumberInput
+                  label="Minimo de noites"
+                  min={1}
+                  value={minimumNights}
+                  onChange={(v) => setMinimumNights(Number(v) || 1)}
+                />
+                <NumberInput
+                  label="Taxa de limpeza"
+                  min={0}
+                  value={cleaningFee}
+                  onChange={(v) => setCleaningFee(Number(v) || 0)}
+                />
+                <NumberInput
+                  label="Caucao"
+                  min={0}
+                  value={securityDeposit}
+                  onChange={(v) => setSecurityDeposit(Number(v) || 0)}
+                />
+                <SimpleGrid cols={2} spacing="xs">
+                  <TextInput
+                    label="Check-in"
+                    type="time"
+                    value={checkInTime}
+                    onChange={(event) => setCheckInTime(event.currentTarget.value)}
+                  />
+                  <TextInput
+                    label="Check-out"
+                    type="time"
+                    value={checkOutTime}
+                    onChange={(event) => setCheckOutTime(event.currentTarget.value)}
+                  />
+                </SimpleGrid>
+              </SimpleGrid>
 
-              <p className="muted">
-                Sem API de mapas paga: o endereco digitado ja e salvo e usado na busca e no Google Maps.
-              </p>
-            </>
-          )}
+              <Textarea
+                label="Regras da casa"
+                minRows={3}
+                placeholder="Ex: sem festas apos 22h, respeito aos vizinhos, etc"
+                value={houseRules}
+                onChange={(event) => setHouseRules(event.currentTarget.value)}
+              />
+            </Stack>
+          ) : null}
 
-          {step === 2 && (
-            <>
-              <label className="field">
-                <span>Fotos (minimo 3)</span>
-                <input type="file" accept="image/*" multiple onChange={onSelectPhotos} />
-              </label>
+          {step === 1 ? (
+            <Stack gap="md">
+              <TextInput
+                label="Endereco de referencia"
+                value={addressText}
+                onChange={(e) => setAddressText(e.currentTarget.value)}
+                placeholder="Rua, numero, bairro"
+                required
+              />
 
-              <div className="photo-grid">
+              <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+                <TextInput label="Latitude (opcional)" value={latText} onChange={(e) => setLatText(e.currentTarget.value)} />
+                <TextInput label="Longitude (opcional)" value={lngText} onChange={(e) => setLngText(e.currentTarget.value)} />
+              </SimpleGrid>
+
+              <Alert color="blue" variant="light">
+                Sem API paga: endereco e usado para geocodificacao automatica no mapa.
+              </Alert>
+            </Stack>
+          ) : null}
+
+          {step === 2 ? (
+            <Stack gap="md">
+              <FileInput
+                label="Fotos (minimo 3)"
+                placeholder="Selecione fotos"
+                multiple
+                accept="image/*"
+                leftSection={<ImagePlus size={16} />}
+                onChange={onSelectPhotos}
+              />
+
+              <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="sm">
                 {photos.map((photo, index) => (
-                  <article key={photo.id} className="photo-item">
-                    <img src={photo.previewUrl} alt={`Foto ${index + 1}`} />
-                    <div className="photo-actions">
-                      {index === 0 ? (
-                        <span className="chip chip-soft">CAPA</span>
-                      ) : (
-                        <button
-                          type="button"
-                          className="btn btn-outline small"
-                          onClick={() => setCoverPhoto(photo.id)}
-                        >
-                          Capa
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        className="btn btn-danger small"
-                        onClick={() => removePhoto(photo.id)}
-                      >
-                        Remover
-                      </button>
-                    </div>
-                  </article>
+                  <Card key={photo.id} withBorder radius="lg" p="xs">
+                    <Stack gap="xs">
+                      <img src={photo.previewUrl} alt={`Foto ${index + 1}`} className="draft-photo" />
+                      <Group justify="space-between" wrap="nowrap">
+                        {index === 0 ? (
+                          <Badge color="ocean">CAPA</Badge>
+                        ) : (
+                          <Button
+                            variant="light"
+                            size="compact-sm"
+                            leftSection={<Star size={14} />}
+                            onClick={() => setCoverPhoto(photo.id)}
+                          >
+                            Capa
+                          </Button>
+                        )}
+
+                        <ActionIcon color="red" variant="light" onClick={() => removePhoto(photo.id)}>
+                          <Trash2 size={14} />
+                        </ActionIcon>
+                      </Group>
+                    </Stack>
+                  </Card>
                 ))}
-              </div>
-            </>
-          )}
+              </SimpleGrid>
 
-          {errorMessage && <p className="alert error">{errorMessage}</p>}
+              <Text size="sm" c={photos.length >= 3 ? 'teal' : 'red'}>
+                Selecionadas: {photos.length} (minimo 3)
+              </Text>
+            </Stack>
+          ) : null}
 
-          <div className="wizard-footer">
-            <button
-              type="button"
-              className="btn btn-outline"
+          {errorMessage ? <Alert color="red">{errorMessage}</Alert> : null}
+
+          <Group justify="space-between">
+            <Button
+              variant="default"
               onClick={() => setStep((value) => Math.max(0, value - 1))}
               disabled={step === 0 || loading}
             >
               Voltar
-            </button>
+            </Button>
 
             {step < 2 ? (
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => setStep((value) => Math.min(2, value + 1))}
-                disabled={!canGoNext || loading}
-              >
+              <Button onClick={() => setStep((value) => Math.min(2, value + 1))} disabled={!canGoNext || loading}>
                 Proximo
-              </button>
+              </Button>
             ) : (
-              <button className="btn btn-primary" type="submit" disabled={loading}>
-                {loading ? 'Publicando...' : 'Publicar anuncio'}
-              </button>
+              <Button loading={loading} onClick={() => void publishProperty()}>
+                Publicar anuncio
+              </Button>
             )}
-          </div>
-        </form>
-      </section>
-    </main>
+          </Group>
+        </Stack>
+      </Card>
+    </Stack>
   );
 }
-

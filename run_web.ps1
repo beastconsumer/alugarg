@@ -30,7 +30,7 @@ function Get-DotEnvValue([string]$Key) {
 }
 
 function Stop-PortProcess([int]$TargetPort) {
-  $matches = netstat -ano | Select-String ":$TargetPort\\s+.*LISTENING\\s+(\\d+)$"
+  $matches = netstat -ano | Select-String ":$TargetPort\s+.*LISTENING\s+(\d+)$"
   $pids = @()
 
   foreach ($m in $matches) {
@@ -97,17 +97,20 @@ if ($invalidUrl -or $invalidAnon) {
 
 Stop-PortProcess -TargetPort $Port
 
-$cmd = @(
-  "cd /d $PSScriptRoot",
+$launcherPath = Join-Path $PSScriptRoot '.run_web_local.cmd'
+$launcherLines = @(
+  '@echo off',
+  ('cd /d "{0}"' -f $PSScriptRoot),
   ('set "VITE_SUPABASE_URL={0}"' -f $SupabaseUrl),
   ('set "VITE_SUPABASE_ANON_KEY={0}"' -f $SupabaseAnonKey),
   ('set "VITE_SUPABASE_BUCKET={0}"' -f $SupabaseBucket),
   'if not exist node_modules npm install',
-  "npm run dev -- --host 127.0.0.1 --port $Port --strictPort"
-) -join ' && '
+  ('npm run dev -- --host 127.0.0.1 --port {0} --strictPort' -f $Port)
+)
+$launcherLines | Set-Content -Path $launcherPath -Encoding ascii
 
 Write-Host 'Subindo app React local...' -ForegroundColor Cyan
-Start-Process -FilePath 'cmd.exe' -ArgumentList '/k', $cmd
+Start-Process -FilePath 'cmd.exe' -ArgumentList '/k', ('"{0}"' -f $launcherPath)
 
 Start-Sleep -Seconds 2
 $localUrl = "http://127.0.0.1:$Port"

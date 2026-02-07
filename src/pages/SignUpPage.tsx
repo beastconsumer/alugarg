@@ -1,5 +1,20 @@
-﻿import { FormEvent, useState } from 'react';
+import { FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import {
+  Alert,
+  Anchor,
+  Box,
+  Button,
+  Container,
+  Paper,
+  PasswordInput,
+  SimpleGrid,
+  Stack,
+  Text,
+  TextInput,
+  Title,
+} from '@mantine/core';
+import { AlertCircle, UserPlus } from 'lucide-react';
 import { parseBirthDateText } from '../lib/format';
 import { toE164Like } from '../lib/phone';
 import { supabase } from '../lib/supabase';
@@ -16,21 +31,19 @@ export function SignUpPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setErrorMessage('');
-    setSuccessMessage('');
 
     const birthDate = parseBirthDateText(birthDateText);
     if (!birthDate) {
-      setErrorMessage('Data invalida. Use formato DD/MM/AAAA.');
+      setErrorMessage('Data invalida. Use DD/MM/AAAA.');
       return;
     }
 
     if (!strongPasswordRegex.test(password)) {
-      setErrorMessage('Senha fraca. Use 8+ caracteres, maiuscula, minuscula, numero e simbolo.');
+      setErrorMessage('Senha fraca. Use 8+ caracteres com maiuscula, minuscula, numero e simbolo.');
       return;
     }
 
@@ -38,6 +51,7 @@ export function SignUpPage() {
 
     try {
       const normalizedPhone = toE164Like(phone);
+
       const { data, error } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
         password,
@@ -51,14 +65,10 @@ export function SignUpPage() {
         },
       });
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       const userId = data.user?.id;
-      if (!userId) {
-        throw new Error('Nao foi possivel criar a conta.');
-      }
+      if (!userId) throw new Error('Nao foi possivel criar a conta.');
 
       if (data.session) {
         const { error: profileError } = await supabase.from('users').upsert({
@@ -70,103 +80,120 @@ export function SignUpPage() {
           birth_date: birthDate,
         });
 
-        if (profileError) {
-          throw profileError;
-        }
+        if (profileError) throw profileError;
 
         navigate('/app/home', { replace: true });
         return;
       }
 
-      setSuccessMessage(
-        'Conta criada. Se a confirmacao de email estiver ativa no Supabase, confirme seu email e depois entre.',
-      );
       navigate('/login', {
         replace: true,
         state: {
           notice:
-            'Conta criada. Se seu projeto exige confirmacao de email, confirme primeiro e depois faca login.',
+            'Conta criada. Se seu projeto exige confirmacao de email, confirme e depois faca login.',
         },
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Falha ao criar conta';
-      setErrorMessage(message);
+      setErrorMessage(error instanceof Error ? error.message : 'Falha ao criar conta');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <main className="screen auth-screen">
-      <section className="card auth-form-card">
-        <h1>Criar conta</h1>
-        <p className="muted">Preencha seus dados para acessar o app.</p>
+    <Box className="auth-screen-shell">
+      <Container size="sm" py={40}>
+        <Paper withBorder radius="xl" shadow="lg" p="xl">
+          <Stack gap="lg">
+            <Stack gap={4}>
+              <Title order={2}>Criar conta</Title>
+              <Text c="dimmed" size="sm">
+                Cadastro completo para reservas e anuncios com seguranca.
+              </Text>
+            </Stack>
 
-        <form className="stack gap-12" onSubmit={onSubmit}>
-          <label className="field">
-            <span>Nome completo</span>
-            <input value={name} onChange={(event) => setName(event.target.value)} required />
-          </label>
+            <form onSubmit={onSubmit}>
+              <Stack gap="md">
+                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+                  <TextInput
+                    label="Nome completo"
+                    placeholder="Seu nome"
+                    value={name}
+                    onChange={(event) => setName(event.currentTarget.value)}
+                    required
+                  />
+                  <TextInput
+                    label="Telefone"
+                    placeholder="+5553999005952"
+                    value={phone}
+                    onChange={(event) => setPhone(event.currentTarget.value)}
+                    required
+                  />
+                </SimpleGrid>
 
-          <label className="field">
-            <span>Telefone</span>
-            <input
-              value={phone}
-              onChange={(event) => setPhone(event.target.value)}
-              placeholder="+5553999005952"
-              required
-            />
-          </label>
+                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+                  <TextInput
+                    label="CPF"
+                    placeholder="000.000.000-00"
+                    value={cpf}
+                    onChange={(event) => setCpf(event.currentTarget.value)}
+                    required
+                  />
+                  <TextInput
+                    label="Data de nascimento"
+                    placeholder="DD/MM/AAAA"
+                    value={birthDateText}
+                    onChange={(event) => setBirthDateText(event.currentTarget.value)}
+                    required
+                  />
+                </SimpleGrid>
 
-          <label className="field">
-            <span>CPF</span>
-            <input value={cpf} onChange={(event) => setCpf(event.target.value)} required />
-          </label>
+                <TextInput
+                  label="Email"
+                  type="email"
+                  placeholder="email@dominio.com"
+                  value={email}
+                  onChange={(event) => setEmail(event.currentTarget.value)}
+                  required
+                />
 
-          <label className="field">
-            <span>Email</span>
-            <input
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              type="email"
-              required
-            />
-          </label>
+                <PasswordInput
+                  label="Senha forte"
+                  description="Minimo 8, com maiuscula, minuscula, numero e simbolo"
+                  placeholder="Crie uma senha"
+                  value={password}
+                  onChange={(event) => setPassword(event.currentTarget.value)}
+                  required
+                />
 
-          <label className="field">
-            <span>Data de nascimento (DD/MM/AAAA)</span>
-            <input
-              value={birthDateText}
-              onChange={(event) => setBirthDateText(event.target.value)}
-              placeholder="31/12/1990"
-              required
-            />
-          </label>
+                {errorMessage ? (
+                  <Alert color="red" variant="light" icon={<AlertCircle size={16} />}>
+                    {errorMessage}
+                  </Alert>
+                ) : null}
 
-          <label className="field">
-            <span>Senha forte</span>
-            <input
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              type="password"
-              placeholder="Min 8 com A-z, 0-9 e simbolo"
-              required
-            />
-          </label>
+                <Button
+                  type="submit"
+                  loading={loading}
+                  leftSection={<UserPlus size={16} />}
+                  variant="gradient"
+                  gradient={{ from: 'ocean.6', to: 'ocean.4', deg: 120 }}
+                  fullWidth
+                >
+                  Criar conta
+                </Button>
+              </Stack>
+            </form>
 
-          {errorMessage && <p className="alert error">{errorMessage}</p>}
-          {successMessage && <p className="alert success">{successMessage}</p>}
-
-          <button className="btn btn-primary" type="submit" disabled={loading}>
-            {loading ? 'Criando conta...' : 'Criar conta'}
-          </button>
-        </form>
-
-        <p className="muted">
-          Ja tem conta? <Link to="/login">Entrar</Link>
-        </p>
-      </section>
-    </main>
+            <Text c="dimmed" size="sm" ta="center">
+              Ja tem conta?{' '}
+              <Anchor component={Link} to="/login" fw={700}>
+                Entrar
+              </Anchor>
+            </Text>
+          </Stack>
+        </Paper>
+      </Container>
+    </Box>
   );
 }
-

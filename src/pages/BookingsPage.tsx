@@ -1,4 +1,5 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { Alert, Badge, Button, Card, Group, Stack, Text, Title } from '@mantine/core';
 import { useAuth } from '../state/AuthContext';
 import { formatDate, formatMoney } from '../lib/format';
 import { supabase } from '../lib/supabase';
@@ -13,34 +14,19 @@ export function BookingsPage() {
   const [errorMessage, setErrorMessage] = useState('');
 
   const loadData = async () => {
-    if (!user) {
-      return;
-    }
+    if (!user) return;
 
     setLoading(true);
     setErrorMessage('');
 
     try {
       const [renterRes, ownerRes] = await Promise.all([
-        supabase
-          .from('bookings')
-          .select('*')
-          .eq('renter_id', user.id)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('bookings')
-          .select('*')
-          .eq('owner_id', user.id)
-          .order('created_at', { ascending: false }),
+        supabase.from('bookings').select('*').eq('renter_id', user.id).order('created_at', { ascending: false }),
+        supabase.from('bookings').select('*').eq('owner_id', user.id).order('created_at', { ascending: false }),
       ]);
 
-      if (renterRes.error) {
-        throw renterRes.error;
-      }
-
-      if (ownerRes.error) {
-        throw ownerRes.error;
-      }
+      if (renterRes.error) throw renterRes.error;
+      if (ownerRes.error) throw ownerRes.error;
 
       setRenterBookings((renterRes.data ?? []).map((row) => parseBooking(row)));
       setOwnerBookings((ownerRes.data ?? []).map((row) => parseBooking(row)));
@@ -62,9 +48,7 @@ export function BookingsPage() {
         .update({ status, updated_at: new Date().toISOString() })
         .eq('id', bookingId);
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       await loadData();
     } catch (error) {
@@ -73,71 +57,81 @@ export function BookingsPage() {
   };
 
   return (
-    <main className="screen content-page">
-      <header className="page-header">
-        <h1>Reservas</h1>
-      </header>
+    <Stack gap="md" py="md" pb={96}>
+      <Card withBorder radius="xl" p="lg">
+        <Stack gap="xs">
+          <Title order={2}>Reservas</Title>
+          <Text c="dimmed">Acompanhe pagamentos, check-in e finalizacao das locacoes.</Text>
+        </Stack>
+      </Card>
 
-      {loading && <p className="muted">Carregando reservas...</p>}
-      {errorMessage && <p className="alert error">{errorMessage}</p>}
+      {loading ? <Text c="dimmed">Carregando reservas...</Text> : null}
+      {errorMessage ? <Alert color="red">{errorMessage}</Alert> : null}
 
-      <section className="card stack gap-12">
-        <h2>Minhas reservas (inquilino)</h2>
+      <Card withBorder radius="xl" p="lg">
+        <Stack gap="md">
+          <Title order={3}>Minhas reservas (inquilino)</Title>
 
-        {renterBookings.length === 0 && <p className="muted">Sem reservas no momento.</p>}
+          {renterBookings.length === 0 ? <Text c="dimmed">Sem reservas no momento.</Text> : null}
 
-        {renterBookings.map((booking) => (
-          <article key={booking.id} className="booking-card">
-            <div>
-              <h3>{booking.property_title}</h3>
-              <p className="muted">
-                {formatDate(booking.check_in_date)} ate {formatDate(booking.check_out_date)}
-              </p>
-              <p>Total pago: {formatMoney(booking.total_paid_by_renter)}</p>
-              <p>Status: {booking.status}</p>
-            </div>
-            <div className="booking-actions">
-              {booking.status === 'pending_payment' && (
-                <button className="btn btn-primary small" onClick={() => void updateStatus(booking.id, 'confirmed')}>
-                  Marcar pagamento
-                </button>
-              )}
-            </div>
-          </article>
-        ))}
-      </section>
+          {renterBookings.map((booking) => (
+            <Card key={booking.id} withBorder radius="lg" p="md">
+              <Group justify="space-between" align="flex-start">
+                <Stack gap={4}>
+                  <Text fw={700}>{booking.property_title}</Text>
+                  <Text size="sm" c="dimmed">
+                    {formatDate(booking.check_in_date)} ate {formatDate(booking.check_out_date)}
+                  </Text>
+                  <Text size="sm">Total pago: {formatMoney(booking.total_paid_by_renter)}</Text>
+                  <Badge variant="light">Status: {booking.status}</Badge>
+                </Stack>
 
-      <section className="card stack gap-12">
-        <h2>Reservas dos meus imoveis (proprietario)</h2>
+                {booking.status === 'pending_payment' ? (
+                  <Button size="xs" onClick={() => void updateStatus(booking.id, 'confirmed')}>
+                    Marcar pagamento
+                  </Button>
+                ) : null}
+              </Group>
+            </Card>
+          ))}
+        </Stack>
+      </Card>
 
-        {ownerBookings.length === 0 && <p className="muted">Sem reservas nos seus imoveis.</p>}
+      <Card withBorder radius="xl" p="lg">
+        <Stack gap="md">
+          <Title order={3}>Reservas dos meus imoveis (proprietario)</Title>
 
-        {ownerBookings.map((booking) => (
-          <article key={booking.id} className="booking-card">
-            <div>
-              <h3>{booking.property_title}</h3>
-              <p className="muted">
-                {formatDate(booking.check_in_date)} ate {formatDate(booking.check_out_date)}
-              </p>
-              <p>Repasse previsto: {formatMoney(booking.owner_payout_amount)}</p>
-              <p>Status: {booking.status}</p>
-            </div>
-            <div className="booking-actions">
-              {booking.status === 'confirmed' && (
-                <button className="btn btn-outline small" onClick={() => void updateStatus(booking.id, 'checked_in')}>
-                  Check-in
-                </button>
-              )}
-              {booking.status === 'checked_in' && (
-                <button className="btn btn-primary small" onClick={() => void updateStatus(booking.id, 'checked_out')}>
-                  Finalizar (check-out)
-                </button>
-              )}
-            </div>
-          </article>
-        ))}
-      </section>
-    </main>
+          {ownerBookings.length === 0 ? <Text c="dimmed">Sem reservas nos seus imoveis.</Text> : null}
+
+          {ownerBookings.map((booking) => (
+            <Card key={booking.id} withBorder radius="lg" p="md">
+              <Group justify="space-between" align="flex-start">
+                <Stack gap={4}>
+                  <Text fw={700}>{booking.property_title}</Text>
+                  <Text size="sm" c="dimmed">
+                    {formatDate(booking.check_in_date)} ate {formatDate(booking.check_out_date)}
+                  </Text>
+                  <Text size="sm">Repasse previsto: {formatMoney(booking.owner_payout_amount)}</Text>
+                  <Badge variant="light">Status: {booking.status}</Badge>
+                </Stack>
+
+                <Group>
+                  {booking.status === 'confirmed' ? (
+                    <Button size="xs" variant="default" onClick={() => void updateStatus(booking.id, 'checked_in')}>
+                      Check-in
+                    </Button>
+                  ) : null}
+                  {booking.status === 'checked_in' ? (
+                    <Button size="xs" onClick={() => void updateStatus(booking.id, 'checked_out')}>
+                      Finalizar
+                    </Button>
+                  ) : null}
+                </Group>
+              </Group>
+            </Card>
+          ))}
+        </Stack>
+      </Card>
+    </Stack>
   );
 }
-

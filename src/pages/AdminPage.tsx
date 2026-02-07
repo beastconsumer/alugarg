@@ -1,4 +1,18 @@
-﻿import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  Group,
+  Paper,
+  PasswordInput,
+  SimpleGrid,
+  Stack,
+  Text,
+  TextInput,
+  Title,
+} from '@mantine/core';
 import { ShieldCheck } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { normalizePhone } from '../lib/phone';
@@ -34,11 +48,7 @@ export function AdminPage() {
       return;
     }
 
-    const { data: profileRow } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', userId)
-      .maybeSingle();
+    const { data: profileRow } = await supabase.from('users').select('*').eq('id', userId).maybeSingle();
 
     const role = String(profileRow?.role ?? 'user');
     setIsAdmin(role === 'admin');
@@ -50,28 +60,18 @@ export function AdminPage() {
     setErrorMessage('');
 
     try {
-      const { data, error } = await supabase
-        .from('properties')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const { data, error } = await supabase.from('properties').select('*').order('created_at', { ascending: false });
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       const parsed = (data ?? []).map((row) => parseProperty(row));
       const ownerIds = Array.from(new Set(parsed.map((item) => item.owner_id)));
 
       let ownerMap = new Map<string, UserProfile>();
       if (ownerIds.length > 0) {
-        const { data: ownerRows, error: ownerError } = await supabase
-          .from('users')
-          .select('*')
-          .in('id', ownerIds);
+        const { data: ownerRows, error: ownerError } = await supabase.from('users').select('*').in('id', ownerIds);
 
-        if (ownerError) {
-          throw ownerError;
-        }
+        if (ownerError) throw ownerError;
 
         ownerMap = new Map(
           (ownerRows ?? []).map((row) => {
@@ -99,9 +99,7 @@ export function AdminPage() {
   }, []);
 
   useEffect(() => {
-    if (!ready || !isAdmin) {
-      return;
-    }
+    if (!ready || !isAdmin) return;
 
     void loadPendingProperties();
 
@@ -148,25 +146,14 @@ export function AdminPage() {
           p_phone: normalizePhone(identifier),
         });
 
-        if (error) {
-          throw error;
-        }
-
-        if (!data) {
-          throw new Error('Telefone nao encontrado.');
-        }
+        if (error) throw error;
+        if (!data) throw new Error('Telefone nao encontrado.');
 
         email = String(data);
       }
 
-      const { error: loginError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (loginError) {
-        throw loginError;
-      }
+      const { error: loginError } = await supabase.auth.signInWithPassword({ email, password });
+      if (loginError) throw loginError;
 
       await loadAdminState();
     } catch (error) {
@@ -187,14 +174,10 @@ export function AdminPage() {
         updated_at: new Date().toISOString(),
       };
 
-      if (typeof verified === 'boolean') {
-        payload.verified = verified;
-      }
+      if (typeof verified === 'boolean') payload.verified = verified;
 
       const { error } = await supabase.from('properties').update(payload).eq('id', propertyId);
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       await loadPendingProperties();
     } catch (error) {
@@ -204,62 +187,87 @@ export function AdminPage() {
 
   if (!ready) {
     return (
-      <main className="screen center-screen">
-        <p className="muted">Inicializando painel...</p>
-      </main>
+      <Stack py="xl" align="center">
+        <Text c="dimmed">Inicializando painel...</Text>
+      </Stack>
     );
   }
 
   if (!sessionUserId) {
     return (
-      <main className="screen center-screen admin-bg">
-        <section className="card admin-login-card stack gap-12">
-          <div>
-            <h1>Aluga Aluga Admin</h1>
-            <p className="muted">Site independente para moderacao e aprovacao de anuncios.</p>
-          </div>
+      <Stack className="admin-page" justify="center" align="center" mih="100dvh" p="md">
+        <Paper withBorder radius="xl" shadow="lg" p="xl" maw={520} w="100%">
+          <Stack gap="md">
+            <Stack gap={4}>
+              <Title order={2}>Aluga Aluga Admin</Title>
+              <Text c="dimmed">Site para moderacao e aprovacao de anuncios.</Text>
+            </Stack>
 
-          <form className="stack gap-12" onSubmit={onLogin}>
-            <label className="field">
-              <span>Email ou telefone admin</span>
-              <input
-                value={identifier}
-                onChange={(event) => setIdentifier(event.target.value)}
-                placeholder="+5553999005952"
-                required
-              />
-            </label>
-            <label className="field">
-              <span>Senha</span>
-              <input
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                type="password"
-                required
-              />
-            </label>
+            <form onSubmit={onLogin}>
+              <Stack gap="md">
+                <TextInput
+                  label="Email ou telefone admin"
+                  value={identifier}
+                  onChange={(event) => setIdentifier(event.currentTarget.value)}
+                  placeholder="+5553999005952"
+                  required
+                />
+                <PasswordInput
+                  label="Senha"
+                  value={password}
+                  onChange={(event) => setPassword(event.currentTarget.value)}
+                  required
+                />
 
-            {errorMessage && <p className="alert error">{errorMessage}</p>}
+                {errorMessage ? <Alert color="red">{errorMessage}</Alert> : null}
 
-            <button className="btn btn-primary" type="submit" disabled={loginLoading}>
-              {loginLoading ? 'Entrando...' : 'Entrar no painel'}
-            </button>
-          </form>
-        </section>
-      </main>
+                <Button type="submit" loading={loginLoading}>
+                  Entrar no painel
+                </Button>
+              </Stack>
+            </form>
+          </Stack>
+        </Paper>
+      </Stack>
     );
   }
 
   if (!isAdmin) {
     return (
-      <main className="screen center-screen admin-bg">
-        <section className="card admin-login-card stack gap-12">
-          <h1>Acesso negado</h1>
-          <p className="alert error">
-            Este usuario nao tem permissao de admin. Promova o role para `admin` no Supabase.
-          </p>
-          <button
-            className="btn btn-outline"
+      <Stack className="admin-page" justify="center" align="center" mih="100dvh" p="md">
+        <Paper withBorder radius="xl" shadow="lg" p="xl" maw={520} w="100%">
+          <Stack gap="md">
+            <Title order={2}>Acesso negado</Title>
+            <Alert color="red">
+              Este usuario nao tem permissao de admin. Promova o role para admin no Supabase.
+            </Alert>
+            <Button
+              variant="default"
+              onClick={() =>
+                void supabase.auth.signOut().then(() => {
+                  setSessionUserId('');
+                  setIsAdmin(false);
+                })
+              }
+            >
+              Limpar sessao atual
+            </Button>
+          </Stack>
+        </Paper>
+      </Stack>
+    );
+  }
+
+  return (
+    <Stack gap="md" p="md" maw={1200} mx="auto" className="admin-page">
+      <Card withBorder radius="xl" p="lg">
+        <Group justify="space-between" align="flex-start">
+          <div>
+            <Title order={2}>Admin Aluga Aluga</Title>
+            <Text c="dimmed">Atualizacao em tempo real de anuncios</Text>
+          </div>
+          <Button
+            variant="default"
             onClick={() =>
               void supabase.auth.signOut().then(() => {
                 setSessionUserId('');
@@ -267,105 +275,91 @@ export function AdminPage() {
               })
             }
           >
-            Limpar sessao atual
-          </button>
-        </section>
-      </main>
-    );
-  }
+            Sair
+          </Button>
+        </Group>
+      </Card>
 
-  return (
-    <main className="screen content-page admin-bg">
-      <header className="page-header">
-        <div>
-          <h1>Admin Aluga Aluga</h1>
-          <p className="muted">Atualizacao em tempo real de anuncios</p>
-        </div>
-        <button
-          className="btn btn-outline"
-          onClick={() =>
-            void supabase.auth.signOut().then(() => {
-              setSessionUserId('');
-              setIsAdmin(false);
-            })
-          }
-        >
-          Sair
-        </button>
-      </header>
+      <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
+        <Card withBorder radius="xl" p="lg">
+          <Text c="dimmed">Pendentes</Text>
+          <Title order={2}>{summary.pending}</Title>
+        </Card>
+        <Card withBorder radius="xl" p="lg">
+          <Text c="dimmed">Aprovados</Text>
+          <Title order={2}>{summary.approved}</Title>
+        </Card>
+        <Card withBorder radius="xl" p="lg">
+          <Text c="dimmed">Rejeitados</Text>
+          <Title order={2}>{summary.rejected}</Title>
+        </Card>
+      </SimpleGrid>
 
-      <section className="inline-grid three">
-        <article className="card stat-card">
-          <h3>Pendentes</h3>
-          <strong>{summary.pending}</strong>
-        </article>
-        <article className="card stat-card">
-          <h3>Aprovados</h3>
-          <strong>{summary.approved}</strong>
-        </article>
-        <article className="card stat-card">
-          <h3>Rejeitados</h3>
-          <strong>{summary.rejected}</strong>
-        </article>
-      </section>
+      {loadingData ? <Text c="dimmed">Carregando anuncios...</Text> : null}
+      {errorMessage ? <Alert color="red">{errorMessage}</Alert> : null}
 
-      {loadingData && <p className="muted">Carregando anuncios...</p>}
-      {errorMessage && <p className="alert error">{errorMessage}</p>}
-
-      <section className="stack gap-12">
+      <Stack gap="sm">
         {items.map(({ property, owner }) => (
-          <article key={property.id} className="card stack gap-12">
-            <div className="inline-grid two align-start">
-              <div>
-                <h2>{property.title}</h2>
-                <p className="muted">{property.location.addressText || 'Sem endereco'}</p>
-                <p>
-                  {formatMoney(property.price)} - {property.rent_type}
-                </p>
-                <p className="muted">
-                  Status: <strong>{property.status}</strong> • Criado em {formatDate(property.created_at)}
-                </p>
-                <p className="muted">Proprietario: {owner?.name || 'Sem nome'} ({owner?.phone || '-'})</p>
-              </div>
+          <Card key={property.id} withBorder radius="xl" p="lg">
+            <Stack gap="md">
+              <Group justify="space-between" align="flex-start">
+                <div>
+                  <Text fw={700} size="lg">
+                    {property.title}
+                  </Text>
+                  <Text c="dimmed" size="sm">
+                    {property.location.addressText || 'Sem endereco'}
+                  </Text>
+                  <Text size="sm">
+                    {formatMoney(property.price)} - {property.rent_type}
+                  </Text>
+                  <Text c="dimmed" size="sm">
+                    Status: {property.status} � Criado em {formatDate(property.created_at)}
+                  </Text>
+                  <Text c="dimmed" size="sm">
+                    Proprietario: {owner?.name || 'Sem nome'} ({owner?.phone || '-'})
+                  </Text>
+                </div>
 
-              <div className="photo-grid mini">
-                {property.photos.slice(0, 3).map((photo) => (
-                  <img key={photo} src={photo} alt={property.title} />
+                <Group gap="xs" wrap="wrap">
+                  {property.verified ? (
+                    <Badge color="teal" leftSection={<ShieldCheck size={14} />}>
+                      Verificado
+                    </Badge>
+                  ) : (
+                    <Badge variant="light">Nao verificado</Badge>
+                  )}
+                </Group>
+              </Group>
+
+              <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="xs">
+                {(property.photos.length > 0 ? property.photos.slice(0, 3) : ['/background.png']).map((photo) => (
+                  <img key={photo} src={photo} alt={property.title} className="admin-photo" />
                 ))}
-              </div>
-            </div>
+              </SimpleGrid>
 
-            <div className="chips-row">
-              {property.verified ? (
-                <span className="chip chip-verified">
-                  <ShieldCheck size={14} /> Verificado
-                </span>
-              ) : (
-                <span className="chip chip-soft">Nao verificado</span>
-              )}
-            </div>
-
-            <div className="inline-grid four">
-              <button className="btn btn-primary small" onClick={() => void updateStatus(property.id, 'approved')}>
-                Aprovar
-              </button>
-              <button className="btn btn-danger small" onClick={() => void updateStatus(property.id, 'rejected')}>
-                Rejeitar
-              </button>
-              <button
-                className="btn btn-outline small"
-                onClick={() => void updateStatus(property.id, property.status, !property.verified)}
-              >
-                {property.verified ? 'Remover selo' : 'Marcar verificado'}
-              </button>
-              <button className="btn btn-outline small" onClick={() => void updateStatus(property.id, 'pending')}>
-                Voltar para pendente
-              </button>
-            </div>
-          </article>
+              <Group wrap="wrap">
+                <Button size="xs" onClick={() => void updateStatus(property.id, 'approved')}>
+                  Aprovar
+                </Button>
+                <Button size="xs" color="red" onClick={() => void updateStatus(property.id, 'rejected')}>
+                  Rejeitar
+                </Button>
+                <Button
+                  size="xs"
+                  variant="default"
+                  onClick={() => void updateStatus(property.id, property.status, !property.verified)}
+                >
+                  {property.verified ? 'Remover selo' : 'Marcar verificado'}
+                </Button>
+                <Button size="xs" variant="default" onClick={() => void updateStatus(property.id, 'pending')}>
+                  Voltar para pendente
+                </Button>
+              </Group>
+            </Stack>
+          </Card>
         ))}
-      </section>
-    </main>
+      </Stack>
+    </Stack>
   );
 }
-
