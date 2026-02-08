@@ -47,6 +47,25 @@ set role = 'admin'
 where phone = '+5553999005952';
 ```
 
+## Email com cara do app (confirmacao)
+### 1) Email de confirmacao de conta (Auth)
+1. No Supabase Dashboard: `Authentication > Email Templates > Confirm signup`.
+2. Copie o HTML de `supabase/templates/auth_confirmation_email.html`.
+3. Cole no template e salve.
+
+### 2) Email de confirmacao de reserva (checkout)
+1. Configure um provedor de envio (ex.: Resend) e crie API key.
+2. Defina secrets da Edge Function:
+```bash
+supabase secrets set RESEND_API_KEY=SEU_TOKEN
+supabase secrets set RESEND_FROM_EMAIL="Aluga Aluga <noreply@seu-dominio.com>"
+```
+3. Deploy da funcao:
+```bash
+supabase functions deploy send-booking-confirmation
+```
+4. Pronto: apos pagamento confirmado no checkout, o app dispara email de confirmacao com layout Aluga Aluga.
+
 ## Fluxos implementados
 - Entrada com background + botoes `Criar conta` e `Ja tenho conta`
 - Cadastro: nome, telefone, CPF, email, data de nascimento digitada, senha forte
@@ -57,6 +76,7 @@ where phone = '+5553999005952';
 - Edicao de anuncio com gerenciamento de fotos (adicionar/remover/capa)
 - Perfil com upload de avatar, meus anuncios, reservas e avaliacoes por tags
 - Painel admin separado para aprovar/rejeitar/verificar anuncios com atualizacao em tempo real
+- Checkout com email de confirmacao + abertura automatica de chat com anfitriao apos pagamento
 
 ## Observacoes
 - O projeto foi migrado para React web e nao depende mais de Flutter para execucao principal.

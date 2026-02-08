@@ -28,7 +28,6 @@ import {
   Heart,
   type LucideIcon,
   MapPin,
-  MessageCircle,
   Navigation,
   PartyPopper,
   Share2,
@@ -64,7 +63,7 @@ const amenityIconPool: LucideIcon[] = [
   Building2,
   PartyPopper,
   BellRing,
-  MessageCircle,
+  ShieldCheck,
 ];
 
 const getAmenityIcon = (amenity: string): LucideIcon => {
@@ -101,9 +100,7 @@ export function PropertyDetailPage() {
   const [checkInDate, setCheckInDate] = useState('');
   const [checkOutDate, setCheckOutDate] = useState('');
   const [guestCount, setGuestCount] = useState(1);
-  const [bookingMessage, setBookingMessage] = useState('');
   const [bookingError, setBookingError] = useState('');
-  const [bookingLoading, setBookingLoading] = useState(false);
   const [showAllAmenities, setShowAllAmenities] = useState(false);
   const [showAllPhotosModal, setShowAllPhotosModal] = useState(false);
 
@@ -183,7 +180,7 @@ export function PropertyDetailPage() {
     };
   }, [property, units]);
 
-  const onCreateBooking = async (event: FormEvent) => {
+  const onCreateBooking = (event: FormEvent) => {
     event.preventDefault();
 
     if (!property || !user) {
@@ -201,34 +198,21 @@ export function PropertyDetailPage() {
       return;
     }
 
-    setBookingLoading(true);
-    setBookingError('');
-    setBookingMessage('');
-
-    try {
-      const { error } = await supabase.from('bookings').insert({
-        property_id: property.id,
-        property_title: property.title,
-        renter_id: user.id,
-        owner_id: property.owner_id,
-        check_in_date: new Date(`${checkInDate}T12:00:00`).toISOString(),
-        check_out_date: new Date(`${checkOutDate}T12:00:00`).toISOString(),
-        units,
-        base_amount: amounts.rentalBase + amounts.cleaningFee,
-        client_fee_amount: amounts.clientFee,
-        owner_fee_amount: amounts.ownerFee,
-        total_paid_by_renter: amounts.totalPaid,
-        owner_payout_amount: amounts.ownerPayout,
-        status: 'pending_payment',
-      });
-
-      if (error) throw error;
-      setBookingMessage('Reserva criada com sucesso. Veja em Reservas para acompanhar.');
-    } catch (error) {
-      setBookingError(error instanceof Error ? error.message : 'Falha ao reservar');
-    } finally {
-      setBookingLoading(false);
+    if (guestCount > property.guests_capacity) {
+      setBookingError(`Este imovel suporta no maximo ${property.guests_capacity} hospede(s).`);
+      return;
     }
+
+    setBookingError('');
+
+    const params = new URLSearchParams({
+      propertyId: property.id,
+      checkIn: checkInDate,
+      checkOut: checkOutDate,
+      guests: String(guestCount),
+    });
+
+    navigate(`/app/checkout?${params.toString()}`);
   };
 
   if (loading) {
@@ -253,12 +237,6 @@ export function PropertyDetailPage() {
   const reviewCount = getReviewCount(property.id);
   const photosRaw = property.photos.length > 0 ? property.photos : ['/background.png'];
   const photos = photosRaw.length >= 5 ? photosRaw : [...photosRaw, ...Array(5 - photosRaw.length).fill(photosRaw[0])];
-
-  const whatsappText = encodeURIComponent(
-    `Ola! Vi seu anuncio no Aluga Aluga: ${property.title}. Ainda esta disponivel?`,
-  );
-  const ownerPhone = owner?.phone ?? '';
-  const whatsappUrl = ownerPhone ? `https://wa.me/${ownerPhone.replace(/\D/g, '')}?text=${whatsappText}` : '';
 
   return (
     <Stack gap="lg" py="md" pb={96}>
@@ -440,16 +418,10 @@ export function PropertyDetailPage() {
             </Title>
             <Text c="dimmed">{property.location.addressText || 'Balneario Cassino, Rio Grande - RS'}</Text>
 
-            <Group mt="sm">
-              {whatsappUrl ? (
-                <Button component="a" href={whatsappUrl} target="_blank" rel="noreferrer" leftSection={<MessageCircle size={16} />}>
-                  Chamar no WhatsApp
-                </Button>
-              ) : (
-                <Button variant="default" disabled>
-                  WhatsApp indisponivel
-                </Button>
-              )}
+            <Stack mt="sm" gap="xs">
+              <Alert color="blue" variant="light">
+                Chat com o locador so e liberado apos pagamento confirmado e status pre-checking.
+              </Alert>
 
               <Button
                 component="a"
@@ -463,7 +435,7 @@ export function PropertyDetailPage() {
               >
                 Ver no mapa
               </Button>
-            </Group>
+            </Stack>
           </section>
         </div>
 
@@ -512,10 +484,9 @@ export function PropertyDetailPage() {
                   </Card>
 
                   {bookingError ? <Alert color="red">{bookingError}</Alert> : null}
-                  {bookingMessage ? <Alert color="green">{bookingMessage}</Alert> : null}
 
-                  <Button type="submit" className="detail-reserve-btn" loading={bookingLoading}>
-                    Reservar
+                  <Button type="submit" className="detail-reserve-btn">
+                    Reservar e pagar
                   </Button>
 
                   <Text size="xs" c="dimmed" ta="center">

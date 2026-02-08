@@ -22,6 +22,7 @@ import {
 import { ImagePlus, Star, Trash2 } from 'lucide-react';
 import { useAuth } from '../state/AuthContext';
 import { amenityOptions } from '../lib/propertyCatalog';
+import { formatCep, isValidCep, resolveLocationFromCepAddress, sanitizeCep } from '../lib/location';
 import { supabase, uploadImageAndGetPublicUrl } from '../lib/supabase';
 import { parseProperty, Property, RentType } from '../lib/types';
 
@@ -80,8 +81,7 @@ export function EditPropertyPage() {
   const [amenities, setAmenities] = useState<string[]>([]);
   const [houseRules, setHouseRules] = useState('');
   const [addressText, setAddressText] = useState('');
-  const [latText, setLatText] = useState('');
-  const [lngText, setLngText] = useState('');
+  const [cep, setCep] = useState('');
   const [draftPhotos, setDraftPhotos] = useState<DraftPhoto[]>([]);
 
   useEffect(() => {
@@ -136,8 +136,7 @@ export function EditPropertyPage() {
         setAmenities(parsed.amenities);
         setHouseRules(parsed.house_rules);
         setAddressText(parsed.location.addressText);
-        setLatText(parsed.location.lat?.toString() ?? '');
-        setLngText(parsed.location.lng?.toString() ?? '');
+        setCep(formatCep(parsed.location.cep || ''));
         setDraftPhotos(
           parsed.photos.map((url) => ({
             id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -193,6 +192,11 @@ export function EditPropertyPage() {
       return;
     }
 
+    if (!isValidCep(cep)) {
+      setErrorMessage('Informe um CEP valido para posicionar corretamente no mapa.');
+      return;
+    }
+
     setSaving(true);
     setErrorMessage('');
 
@@ -210,8 +214,10 @@ export function EditPropertyPage() {
         finalUrls.push(uploadedUrl);
       }
 
-      const lat = Number(latText);
-      const lng = Number(lngText);
+      const resolvedLocation = await resolveLocationFromCepAddress(cep, addressText);
+      if (resolvedLocation.lat === null || resolvedLocation.lng === null) {
+        throw new Error('Nao foi possivel localizar este endereco. Confira CEP e endereco.');
+      }
 
       const { error } = await supabase
         .from('properties')
@@ -239,9 +245,10 @@ export function EditPropertyPage() {
           house_rules: houseRules.trim(),
           photos: finalUrls,
           location: {
-            lat: Number.isFinite(lat) ? lat : null,
-            lng: Number.isFinite(lng) ? lng : null,
-            addressText: addressText.trim(),
+            lat: resolvedLocation.lat,
+            lng: resolvedLocation.lng,
+            addressText: resolvedLocation.addressText,
+            cep: resolvedLocation.cep,
           },
           updated_at: new Date().toISOString(),
         })
@@ -392,12 +399,17 @@ export function EditPropertyPage() {
           />
 
           <Title order={4}>Localizacao</Title>
+          <TextInput
+            label="CEP"
+            placeholder="00000-000"
+            value={cep}
+            onChange={(event) => setCep(formatCep(event.currentTarget.value))}
+            required
+          />
+
           <TextInput label="Endereco" value={addressText} onChange={(event) => setAddressText(event.currentTarget.value)} required />
 
-          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
-            <TextInput label="Latitude (opcional)" value={latText} onChange={(event) => setLatText(event.currentTarget.value)} />
-            <TextInput label="Longitude (opcional)" value={lngText} onChange={(event) => setLngText(event.currentTarget.value)} />
-          </SimpleGrid>
+          {cep && !isValidCep(sanitizeCep(cep)) ? <Alert color="yellow">CEP invalido. Use 8 digitos.</Alert> : null}
 
           <Title order={4}>Fotos</Title>
           <FileInput

@@ -673,6 +673,24 @@ body {
   border: 1px solid #dde4f2;
 }
 
+.admin-chat-conversation {
+  border-color: #dbe4f3;
+}
+
+.admin-chat-conversation.active {
+  border-color: #0b5fff;
+  box-shadow: inset 0 0 0 1px #0b5fff;
+}
+
+.admin-chat-message {
+  border-color: #e3e8f2;
+}
+
+.admin-chat-message.system {
+  background: #f4f8ff;
+  border-color: #cddcff;
+}
+
 .map-card {
   overflow: hidden;
 }
@@ -681,6 +699,17 @@ body {
   width: 100%;
   height: min(62vh, 560px);
   border-radius: 16px;
+}
+
+.map-popup-card {
+  width: 220px;
+}
+
+.map-popup-image {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 8px;
 }
 
 .home-pin-wrap {
@@ -695,6 +724,82 @@ body {
   background: #0b5fff;
   border: 3px solid #ffffff;
   box-shadow: 0 0 0 3px rgba(11, 95, 255, 0.25);
+}
+
+.checkout-layout {
+  align-items: start;
+}
+
+.checkout-summary-card,
+.checkout-payment-card {
+  border-color: #d9e2f1;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+.checkout-cover-wrap {
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid #e4e9f3;
+}
+
+.checkout-cover-image {
+  width: 100%;
+  height: 210px;
+  object-fit: cover;
+}
+
+.checkout-total-line {
+  font-size: 1.08rem;
+}
+
+.bookings-kpi-card {
+  border-color: #d9e3f3;
+  background: linear-gradient(180deg, #ffffff, #f8fbff);
+}
+
+.booking-card {
+  border-color: #dde5f2;
+}
+
+.chat-scroll {
+  max-height: 420px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.chat-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.chat-scroll::-webkit-scrollbar-thumb {
+  background: #d3d9e6;
+  border-radius: 999px;
+}
+
+.chat-bubble {
+  max-width: min(82%, 560px);
+  border-radius: 14px;
+  border: 1px solid #e2e8f3;
+  padding: 10px 12px;
+  background: #ffffff;
+}
+
+.chat-bubble.mine {
+  margin-left: auto;
+  background: linear-gradient(180deg, #eef4ff, #e6f0ff);
+  border-color: #cfdfff;
+}
+
+.chat-bubble.theirs {
+  margin-right: auto;
+  background: #ffffff;
+}
+
+.chat-bubble.system {
+  margin-inline: auto;
+  max-width: min(94%, 680px);
+  background: #f8fbff;
+  border-color: #dce8ff;
 }
 
 @media (max-width: 680px) {
@@ -776,5 +881,9 @@ body {
 
   .detail-reserve-sticky {
     position: static;
+  }
+
+  .checkout-cover-image {
+    height: 180px;
   }
 }

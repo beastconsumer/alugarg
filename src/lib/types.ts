@@ -2,6 +2,7 @@
 export type PropertyStatus = 'pending' | 'approved' | 'rejected';
 export type BookingStatus =
   | 'pending_payment'
+  | 'pre_checking'
   | 'confirmed'
   | 'checked_in'
   | 'checked_out'
@@ -11,6 +12,7 @@ export interface PropertyLocation {
   lat: number | null;
   lng: number | null;
   addressText: string;
+  cep: string;
 }
 
 export interface Property {
@@ -89,6 +91,29 @@ export interface OwnerReview {
   created_at: string;
 }
 
+export type ChatConversationStatus = 'open' | 'closed' | 'blocked';
+
+export interface ChatConversation {
+  id: string;
+  booking_id: string;
+  property_id: string;
+  renter_id: string;
+  owner_id: string;
+  status: ChatConversationStatus;
+  created_at: string;
+  updated_at: string;
+  last_message_at: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  message_text: string;
+  is_system: boolean;
+  created_at: string;
+}
+
 export const rentTypeLabel: Record<RentType, string> = {
   mensal: 'Mensal',
   temporada: 'Temporada',
@@ -103,7 +128,7 @@ export const statusLabel: Record<PropertyStatus, string> = {
 
 export const parseLocation = (raw: unknown): PropertyLocation => {
   if (!raw || typeof raw !== 'object') {
-    return { lat: null, lng: null, addressText: '' };
+    return { lat: null, lng: null, addressText: '', cep: '' };
   }
 
   const value = raw as Record<string, unknown>;
@@ -112,6 +137,7 @@ export const parseLocation = (raw: unknown): PropertyLocation => {
     lat: typeof value.lat === 'number' ? value.lat : null,
     lng: typeof value.lng === 'number' ? value.lng : null,
     addressText: typeof value.addressText === 'string' ? value.addressText : '',
+    cep: typeof value.cep === 'string' ? value.cep : '',
   };
 };
 
@@ -188,6 +214,27 @@ export const parseOwnerReview = (raw: Record<string, unknown>): OwnerReview => (
   rating: Number(raw.rating ?? 5),
   tags: Array.isArray(raw.tags) ? raw.tags.map((item) => String(item)) : [],
   comment: String(raw.comment ?? ''),
+  created_at: String(raw.created_at ?? ''),
+});
+
+export const parseChatConversation = (raw: Record<string, unknown>): ChatConversation => ({
+  id: String(raw.id ?? ''),
+  booking_id: String(raw.booking_id ?? ''),
+  property_id: String(raw.property_id ?? ''),
+  renter_id: String(raw.renter_id ?? ''),
+  owner_id: String(raw.owner_id ?? ''),
+  status: (String(raw.status ?? 'open') as ChatConversationStatus),
+  created_at: String(raw.created_at ?? ''),
+  updated_at: String(raw.updated_at ?? ''),
+  last_message_at: String(raw.last_message_at ?? ''),
+});
+
+export const parseChatMessage = (raw: Record<string, unknown>): ChatMessage => ({
+  id: String(raw.id ?? ''),
+  conversation_id: String(raw.conversation_id ?? ''),
+  sender_id: String(raw.sender_id ?? ''),
+  message_text: String(raw.message_text ?? ''),
+  is_system: Boolean(raw.is_system ?? false),
   created_at: String(raw.created_at ?? ''),
 });
 

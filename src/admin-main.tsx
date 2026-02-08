@@ -6,6 +6,7 @@ import { envIssue } from './env';
 import { ErrorScreen } from './components/ErrorScreen';
 import { AdminPage } from './pages/AdminPage';
 import { appTheme } from './theme';
+import './tailwind.css';
 import './styles.css';
 import '@mantine/core/styles.css';
 import '@mantine/dates/styles.css';
@@ -13,7 +14,7 @@ import '@mantine/notifications/styles.css';
 
 ReactDOM.createRoot(document.getElementById('admin-root')!).render(
   <React.StrictMode>
-    <MantineProvider theme={appTheme} defaultColorScheme="light">
+    <MantineProvider theme={appTheme} defaultColorScheme="dark">
       <Notifications position="top-right" />
       {envIssue ? <ErrorScreen title="Configuracao invalida" message={envIssue} /> : <AdminPage />}
     </MantineProvider>

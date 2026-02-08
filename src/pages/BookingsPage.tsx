@@ -1,9 +1,34 @@
-import { useEffect, useState } from 'react';
-import { Alert, Badge, Button, Card, Group, Stack, Text, Title } from '@mantine/core';
+import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  Group,
+  SimpleGrid,
+  Stack,
+  Tabs,
+  Text,
+  Title,
+} from '@mantine/core';
+import { CalendarCheck2, CircleDollarSign, Clock3, House } from 'lucide-react';
 import { useAuth } from '../state/AuthContext';
 import { formatDate, formatMoney } from '../lib/format';
 import { supabase } from '../lib/supabase';
 import { Booking, parseBooking } from '../lib/types';
+
+const bookingStatusMeta: Record<
+  Booking['status'],
+  { label: string; color: 'yellow' | 'teal' | 'blue' | 'gray' | 'red' }
+> = {
+  pending_payment: { label: 'Pagamento pendente', color: 'yellow' },
+  pre_checking: { label: 'Pre-checking', color: 'teal' },
+  confirmed: { label: 'Check-in pendente', color: 'teal' },
+  checked_in: { label: 'Check-in realizado', color: 'blue' },
+  checked_out: { label: 'Finalizada', color: 'gray' },
+  cancelled: { label: 'Cancelada', color: 'red' },
+};
 
 export function BookingsPage() {
   const { user } = useAuth();
@@ -28,8 +53,11 @@ export function BookingsPage() {
       if (renterRes.error) throw renterRes.error;
       if (ownerRes.error) throw ownerRes.error;
 
-      setRenterBookings((renterRes.data ?? []).map((row) => parseBooking(row)));
-      setOwnerBookings((ownerRes.data ?? []).map((row) => parseBooking(row)));
+      const parsedRenter = (renterRes.data ?? []).map((row) => parseBooking(row));
+      const parsedOwner = (ownerRes.data ?? []).map((row) => parseBooking(row));
+
+      setRenterBookings(parsedRenter);
+      setOwnerBookings(parsedOwner);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Falha ao carregar reservas');
     } finally {
@@ -49,89 +77,241 @@ export function BookingsPage() {
         .eq('id', bookingId);
 
       if (error) throw error;
-
       await loadData();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Nao foi possivel atualizar status');
     }
   };
 
+  const renterStats = useMemo(() => {
+    const pendingPayment = renterBookings.filter((item) => item.status === 'pending_payment').length;
+    const active = renterBookings.filter(
+      (item) => item.status === 'pre_checking' || item.status === 'confirmed' || item.status === 'checked_in',
+    ).length;
+    const completed = renterBookings.filter((item) => item.status === 'checked_out').length;
+
+    return { pendingPayment, active, completed };
+  }, [renterBookings]);
+
+  const ownerStats = useMemo(() => {
+    const upcoming = ownerBookings.filter((item) => item.status === 'pre_checking' || item.status === 'confirmed').length;
+    const inStay = ownerBookings.filter((item) => item.status === 'checked_in').length;
+    const totalPayout = ownerBookings
+      .filter(
+        (item) =>
+          item.status === 'pre_checking' ||
+          item.status === 'confirmed' ||
+          item.status === 'checked_in' ||
+          item.status === 'checked_out',
+      )
+      .reduce((acc, item) => acc + item.owner_payout_amount, 0);
+
+    return { upcoming, inStay, totalPayout };
+  }, [ownerBookings]);
+
   return (
     <Stack gap="md" py="md" pb={96}>
       <Card withBorder radius="xl" p="lg">
         <Stack gap="xs">
           <Title order={2}>Reservas</Title>
-          <Text c="dimmed">Acompanhe pagamentos, check-in e finalizacao das locacoes.</Text>
+          <Text c="dimmed">Fluxo completo de pagamento, check-in e finalizacao de estadia.</Text>
         </Stack>
       </Card>
 
       {loading ? <Text c="dimmed">Carregando reservas...</Text> : null}
       {errorMessage ? <Alert color="red">{errorMessage}</Alert> : null}
 
-      <Card withBorder radius="xl" p="lg">
-        <Stack gap="md">
-          <Title order={3}>Minhas reservas (inquilino)</Title>
+      <Tabs defaultValue="renter" radius="md" keepMounted={false}>
+        <Tabs.List>
+          <Tabs.Tab value="renter">Como inquilino</Tabs.Tab>
+          <Tabs.Tab value="owner">Como proprietario</Tabs.Tab>
+        </Tabs.List>
 
-          {renterBookings.length === 0 ? <Text c="dimmed">Sem reservas no momento.</Text> : null}
-
-          {renterBookings.map((booking) => (
-            <Card key={booking.id} withBorder radius="lg" p="md">
-              <Group justify="space-between" align="flex-start">
-                <Stack gap={4}>
-                  <Text fw={700}>{booking.property_title}</Text>
-                  <Text size="sm" c="dimmed">
-                    {formatDate(booking.check_in_date)} ate {formatDate(booking.check_out_date)}
-                  </Text>
-                  <Text size="sm">Total pago: {formatMoney(booking.total_paid_by_renter)}</Text>
-                  <Badge variant="light">Status: {booking.status}</Badge>
-                </Stack>
-
-                {booking.status === 'pending_payment' ? (
-                  <Button size="xs" onClick={() => void updateStatus(booking.id, 'confirmed')}>
-                    Marcar pagamento
-                  </Button>
-                ) : null}
-              </Group>
-            </Card>
-          ))}
-        </Stack>
-      </Card>
-
-      <Card withBorder radius="xl" p="lg">
-        <Stack gap="md">
-          <Title order={3}>Reservas dos meus imoveis (proprietario)</Title>
-
-          {ownerBookings.length === 0 ? <Text c="dimmed">Sem reservas nos seus imoveis.</Text> : null}
-
-          {ownerBookings.map((booking) => (
-            <Card key={booking.id} withBorder radius="lg" p="md">
-              <Group justify="space-between" align="flex-start">
-                <Stack gap={4}>
-                  <Text fw={700}>{booking.property_title}</Text>
-                  <Text size="sm" c="dimmed">
-                    {formatDate(booking.check_in_date)} ate {formatDate(booking.check_out_date)}
-                  </Text>
-                  <Text size="sm">Repasse previsto: {formatMoney(booking.owner_payout_amount)}</Text>
-                  <Badge variant="light">Status: {booking.status}</Badge>
-                </Stack>
-
-                <Group>
-                  {booking.status === 'confirmed' ? (
-                    <Button size="xs" variant="default" onClick={() => void updateStatus(booking.id, 'checked_in')}>
-                      Check-in
-                    </Button>
-                  ) : null}
-                  {booking.status === 'checked_in' ? (
-                    <Button size="xs" onClick={() => void updateStatus(booking.id, 'checked_out')}>
-                      Finalizar
-                    </Button>
-                  ) : null}
+        <Tabs.Panel value="renter" pt="md">
+          <Stack gap="md">
+            <SimpleGrid cols={{ base: 1, sm: 3 }}>
+              <Card withBorder radius="lg" p="md" className="bookings-kpi-card">
+                <Group justify="space-between">
+                  <Stack gap={2}>
+                    <Text size="sm" c="dimmed">
+                      Pagamento pendente
+                    </Text>
+                    <Title order={3}>{renterStats.pendingPayment}</Title>
+                  </Stack>
+                  <Clock3 size={20} />
                 </Group>
-              </Group>
+              </Card>
+
+              <Card withBorder radius="lg" p="md" className="bookings-kpi-card">
+                <Group justify="space-between">
+                  <Stack gap={2}>
+                    <Text size="sm" c="dimmed">
+                      Viagens ativas
+                    </Text>
+                    <Title order={3}>{renterStats.active}</Title>
+                  </Stack>
+                  <CalendarCheck2 size={20} />
+                </Group>
+              </Card>
+
+              <Card withBorder radius="lg" p="md" className="bookings-kpi-card">
+                <Group justify="space-between">
+                  <Stack gap={2}>
+                    <Text size="sm" c="dimmed">
+                      Concluidas
+                    </Text>
+                    <Title order={3}>{renterStats.completed}</Title>
+                  </Stack>
+                  <House size={20} />
+                </Group>
+              </Card>
+            </SimpleGrid>
+
+            <Card withBorder radius="xl" p="lg">
+              <Stack gap="md">
+                <Title order={4}>Minhas reservas</Title>
+                {renterBookings.length === 0 ? <Text c="dimmed">Sem reservas no momento.</Text> : null}
+
+                {renterBookings.map((booking) => {
+                  const normalizedStatus: Booking['status'] =
+                    booking.status === 'confirmed' ? 'pre_checking' : booking.status;
+                  const meta = bookingStatusMeta[normalizedStatus];
+
+                  return (
+                    <Card key={booking.id} withBorder radius="lg" p="md" className="booking-card">
+                      <Stack gap="sm">
+                        <Stack gap={5}>
+                          <Text fw={700}>{booking.property_title}</Text>
+                          <Text size="sm" c="dimmed">
+                            {formatDate(booking.check_in_date)} ate {formatDate(booking.check_out_date)}
+                          </Text>
+                          <Text size="sm">Total pago: {formatMoney(booking.total_paid_by_renter)}</Text>
+                          <Badge variant="light" color={meta.color}>
+                            {meta.label}
+                          </Badge>
+                        </Stack>
+
+                        <Group wrap="wrap" gap="xs">
+                          {normalizedStatus === 'pending_payment' ? (
+                            <Button component={Link} to={`/app/checkout/${booking.id}`} size="xs">
+                              Pagar agora
+                            </Button>
+                          ) : null}
+                          {normalizedStatus === 'pre_checking' ? (
+                            <Button size="xs" variant="light" color="teal" disabled>
+                              Check-in pendente
+                            </Button>
+                          ) : null}
+                          {['pre_checking', 'checked_in', 'checked_out'].includes(normalizedStatus) ? (
+                            <Button component={Link} to={`/app/chat?bookingId=${booking.id}`} size="xs" variant="default">
+                              Chat com dono
+                            </Button>
+                          ) : null}
+
+                          {normalizedStatus === 'checked_out' ? (
+                            <Button component={Link} to="/app/profile" size="xs" variant="default">
+                              Avaliar anfitriao
+                            </Button>
+                          ) : null}
+                        </Group>
+                      </Stack>
+                    </Card>
+                  );
+                })}
+              </Stack>
             </Card>
-          ))}
-        </Stack>
-      </Card>
+          </Stack>
+        </Tabs.Panel>
+
+        <Tabs.Panel value="owner" pt="md">
+          <Stack gap="md">
+            <SimpleGrid cols={{ base: 1, sm: 3 }}>
+              <Card withBorder radius="lg" p="md" className="bookings-kpi-card">
+                <Group justify="space-between">
+                  <Stack gap={2}>
+                    <Text size="sm" c="dimmed">
+                      Check-ins pendentes
+                    </Text>
+                    <Title order={3}>{ownerStats.upcoming}</Title>
+                  </Stack>
+                  <CalendarCheck2 size={20} />
+                </Group>
+              </Card>
+
+              <Card withBorder radius="lg" p="md" className="bookings-kpi-card">
+                <Group justify="space-between">
+                  <Stack gap={2}>
+                    <Text size="sm" c="dimmed">
+                      Hospedagens em curso
+                    </Text>
+                    <Title order={3}>{ownerStats.inStay}</Title>
+                  </Stack>
+                  <House size={20} />
+                </Group>
+              </Card>
+
+              <Card withBorder radius="lg" p="md" className="bookings-kpi-card">
+                <Group justify="space-between">
+                  <Stack gap={2}>
+                    <Text size="sm" c="dimmed">
+                      Repasse acumulado
+                    </Text>
+                    <Title order={4}>{formatMoney(ownerStats.totalPayout)}</Title>
+                  </Stack>
+                  <CircleDollarSign size={20} />
+                </Group>
+              </Card>
+            </SimpleGrid>
+
+            <Card withBorder radius="xl" p="lg">
+              <Stack gap="md">
+                <Title order={4}>Reservas dos meus imoveis</Title>
+                {ownerBookings.length === 0 ? <Text c="dimmed">Sem reservas nos seus imoveis.</Text> : null}
+
+                {ownerBookings.map((booking) => {
+                  const normalizedStatus: Booking['status'] =
+                    booking.status === 'confirmed' ? 'pre_checking' : booking.status;
+                  const meta = bookingStatusMeta[normalizedStatus];
+                  return (
+                    <Card key={booking.id} withBorder radius="lg" p="md" className="booking-card">
+                      <Group justify="space-between" align="flex-start" gap="md">
+                        <Stack gap={5}>
+                          <Text fw={700}>{booking.property_title}</Text>
+                          <Text size="sm" c="dimmed">
+                            {formatDate(booking.check_in_date)} ate {formatDate(booking.check_out_date)}
+                          </Text>
+                          <Text size="sm">Repasse previsto: {formatMoney(booking.owner_payout_amount)}</Text>
+                          <Badge variant="light" color={meta.color}>
+                            {meta.label}
+                          </Badge>
+                        </Stack>
+
+                        <Group>
+                          {['pre_checking', 'checked_in', 'checked_out'].includes(normalizedStatus) ? (
+                            <Button component={Link} to={`/app/chat?bookingId=${booking.id}`} size="xs" variant="default">
+                              Abrir chat
+                            </Button>
+                          ) : null}
+                          {normalizedStatus === 'pre_checking' ? (
+                            <Button size="xs" variant="default" onClick={() => void updateStatus(booking.id, 'checked_in')}>
+                              Confirmar check-in
+                            </Button>
+                          ) : null}
+                          {normalizedStatus === 'checked_in' ? (
+                            <Button size="xs" onClick={() => void updateStatus(booking.id, 'checked_out')}>
+                              Finalizar estadia
+                            </Button>
+                          ) : null}
+                        </Group>
+                      </Group>
+                    </Card>
+                  );
+                })}
+              </Stack>
+            </Card>
+          </Stack>
+        </Tabs.Panel>
+      </Tabs>
     </Stack>
   );
 }

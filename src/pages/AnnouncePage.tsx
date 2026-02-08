@@ -23,6 +23,7 @@ import {
 import { ImagePlus, Star, Trash2 } from 'lucide-react';
 import { useAuth } from '../state/AuthContext';
 import { env } from '../env';
+import { formatCep, isValidCep, resolveLocationFromCepAddress, sanitizeCep } from '../lib/location';
 import { uploadImageAndGetPublicUrl, supabase } from '../lib/supabase';
 import { amenityOptions } from '../lib/propertyCatalog';
 import { RentType } from '../lib/types';
@@ -71,8 +72,7 @@ export function AnnouncePage() {
   const [houseRules, setHouseRules] = useState('');
 
   const [addressText, setAddressText] = useState('');
-  const [latText, setLatText] = useState('');
-  const [lngText, setLngText] = useState('');
+  const [cep, setCep] = useState('');
 
   const [photos, setPhotos] = useState<DraftPhoto[]>([]);
 
@@ -119,7 +119,7 @@ export function AnnouncePage() {
     }
 
     if (step === 1) {
-      return addressText.trim().length > 5;
+      return addressText.trim().length > 5 && isValidCep(cep);
     }
 
     return true;
@@ -148,8 +148,10 @@ export function AnnouncePage() {
         uploadedUrls.push(url);
       }
 
-      const lat = Number(latText);
-      const lng = Number(lngText);
+      const resolvedLocation = await resolveLocationFromCepAddress(cep, addressText);
+      if (resolvedLocation.lat === null || resolvedLocation.lng === null) {
+        throw new Error('Nao foi possivel localizar este endereco. Confira o CEP e endereco.');
+      }
 
       const { error } = await supabase.from('properties').insert({
         owner_id: user.id,
@@ -178,9 +180,10 @@ export function AnnouncePage() {
         status: 'pending',
         photos: uploadedUrls,
         location: {
-          lat: Number.isFinite(lat) ? lat : null,
-          lng: Number.isFinite(lng) ? lng : null,
-          addressText: addressText.trim(),
+          lat: resolvedLocation.lat,
+          lng: resolvedLocation.lng,
+          addressText: resolvedLocation.addressText,
+          cep: resolvedLocation.cep,
         },
       });
 
@@ -352,6 +355,14 @@ export function AnnouncePage() {
           {step === 1 ? (
             <Stack gap="md">
               <TextInput
+                label="CEP"
+                placeholder="00000-000"
+                value={cep}
+                onChange={(e) => setCep(formatCep(e.currentTarget.value))}
+                required
+              />
+
+              <TextInput
                 label="Endereco de referencia"
                 value={addressText}
                 onChange={(e) => setAddressText(e.currentTarget.value)}
@@ -359,14 +370,11 @@ export function AnnouncePage() {
                 required
               />
 
-              <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
-                <TextInput label="Latitude (opcional)" value={latText} onChange={(e) => setLatText(e.currentTarget.value)} />
-                <TextInput label="Longitude (opcional)" value={lngText} onChange={(e) => setLngText(e.currentTarget.value)} />
-              </SimpleGrid>
-
               <Alert color="blue" variant="light">
-                Sem API paga: endereco e usado para geocodificacao automatica no mapa.
+                O mapa usa CEP + endereco para posicionar a casa com mais precisao.
               </Alert>
+
+              {cep && !isValidCep(sanitizeCep(cep)) ? <Alert color="yellow">CEP invalido. Use 8 digitos.</Alert> : null}
             </Stack>
           ) : null}
 

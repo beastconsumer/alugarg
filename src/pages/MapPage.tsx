@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Button, Card, Group, Select, Stack, Text, Title } from '@mantine/core';
-import { ExternalLink, MapPin, RotateCcw } from 'lucide-react';
+import { Alert, Button, Card, Group, Image, Select, Stack, Text, Title } from '@mantine/core';
+import { MapPin } from 'lucide-react';
 import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+import { resolveLocationFromCepAddress, isWithinRegion } from '../lib/location';
 import { seedProperties } from '../lib/seedProperties';
 import { supabase } from '../lib/supabase';
 import { formatMoney } from '../lib/format';
@@ -18,29 +19,9 @@ interface MapPoint {
   lat: number;
   lng: number;
 }
-
-interface GeocodeValue {
-  lat: number;
-  lng: number;
-}
-
-interface NominatimRow {
-  lat: string;
-  lon: string;
-  display_name: string;
-}
-
-type GeocodeCache = Record<string, GeocodeValue>;
+type GeocodeCache = Record<string, { lat: number; lng: number }>;
 
 const GEOCODE_CACHE_KEY = 'aluga_geocode_cache_v2';
-
-// Region around Rio Grande + Cassino to avoid wrong matches from other states/cities.
-const REGION_BOUNDS = {
-  north: -31.85,
-  south: -32.40,
-  west: -52.42,
-  east: -51.88,
-};
 
 const locationOptions: Record<LocationKey, { label: string; lat: number; lng: number; zoom: number }> = {
   cassino: {
@@ -71,7 +52,11 @@ const homeIcon = L.divIcon({
   iconAnchor: [9, 9],
 });
 
-const normalizeAddressKey = (address: string): string => address.trim().toLowerCase();
+const locationCacheKey = (property: Property): string => {
+  const cep = property.location.cep || '';
+  const address = property.location.addressText.trim().toLowerCase();
+  return `${cep}|${address}`;
+};
 
 const loadCache = (): GeocodeCache => {
   try {
@@ -91,69 +76,6 @@ const saveCache = (cache: GeocodeCache) => {
   }
 };
 
-const isWithinRegion = (lat: number, lng: number): boolean => {
-  return (
-    lat <= REGION_BOUNDS.north &&
-    lat >= REGION_BOUNDS.south &&
-    lng >= REGION_BOUNDS.west &&
-    lng <= REGION_BOUNDS.east
-  );
-};
-
-const scoreResult = (row: NominatimRow): number => {
-  const name = row.display_name.toLowerCase();
-  let score = 0;
-  if (name.includes('rio grande')) score += 4;
-  if (name.includes('cassino')) score += 3;
-  if (name.includes('balneario')) score += 1;
-  if (name.includes('rio grande do sul')) score += 1;
-  return score;
-};
-
-const geocodeAddress = async (address: string): Promise<GeocodeValue | null> => {
-  const viewbox = `${REGION_BOUNDS.west},${REGION_BOUNDS.north},${REGION_BOUNDS.east},${REGION_BOUNDS.south}`;
-  const queries = [
-    `${address}, Balneario Cassino, Rio Grande, RS, Brasil`,
-    `${address}, Rio Grande, RS, Brasil`,
-  ];
-
-  let best: { score: number; lat: number; lng: number } | null = null;
-
-  for (const q of queries) {
-    const params = new URLSearchParams({
-      format: 'jsonv2',
-      addressdetails: '1',
-      limit: '5',
-      countrycodes: 'br',
-      bounded: '1',
-      viewbox,
-      q,
-    });
-
-    const response = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`);
-    if (!response.ok) continue;
-
-    const rows = (await response.json()) as NominatimRow[];
-    for (const row of rows) {
-      const lat = Number(row.lat);
-      const lng = Number(row.lon);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
-      if (!isWithinRegion(lat, lng)) continue;
-
-      const score = scoreResult(row);
-      if (!best || score > best.score) {
-        best = { score, lat, lng };
-      }
-    }
-
-    // Small delay to respect Nominatim rate limits in sequence calls.
-    await new Promise((resolve) => setTimeout(resolve, 220));
-  }
-
-  if (!best) return null;
-  return { lat: best.lat, lng: best.lng };
-};
-
 function RecenterMap({ center, zoom }: { center: [number, number]; zoom: number }) {
   const map = useMap();
 
@@ -171,12 +93,6 @@ export function MapPage() {
   const [resolvingPoints, setResolvingPoints] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [selectedLocation, setSelectedLocation] = useState<LocationKey>('cassino');
-  const [geocodeVersion, setGeocodeVersion] = useState(0);
-
-  const reloadWithFreshGeocode = () => {
-    localStorage.removeItem(GEOCODE_CACHE_KEY);
-    setGeocodeVersion((value) => value + 1);
-  };
 
   useEffect(() => {
     const run = async () => {
@@ -215,22 +131,28 @@ export function MapPage() {
       const points: MapPoint[] = [];
 
       for (const property of properties) {
-        const address = property.location.addressText.trim();
-        if (!address) continue;
+        const existingLat = property.location.lat;
+        const existingLng = property.location.lng;
+        if (typeof existingLat === 'number' && typeof existingLng === 'number') {
+          points.push({ property, lat: existingLat, lng: existingLng });
+          continue;
+        }
 
-        const key = normalizeAddressKey(address);
+        if (!property.location.addressText.trim() && !(property.location.cep || '').trim()) continue;
+
+        const key = locationCacheKey(property);
         const cached = cache[key];
         if (cached && isWithinRegion(cached.lat, cached.lng)) {
           points.push({ property, lat: cached.lat, lng: cached.lng });
           continue;
         }
 
-        const geocoded = await geocodeAddress(address);
-        if (!geocoded) continue;
+        const resolved = await resolveLocationFromCepAddress(property.location.cep || '', property.location.addressText);
+        if (resolved.lat === null || resolved.lng === null) continue;
 
-        cache[key] = geocoded;
+        cache[key] = { lat: resolved.lat, lng: resolved.lng };
         cacheChanged = true;
-        points.push({ property, lat: geocoded.lat, lng: geocoded.lng });
+        points.push({ property, lat: resolved.lat, lng: resolved.lng });
       }
 
       if (cacheChanged) saveCache(cache);
@@ -245,7 +167,7 @@ export function MapPage() {
     return () => {
       mounted = false;
     };
-  }, [properties, geocodeVersion]);
+  }, [properties]);
 
   const activeLocation = locationOptions[selectedLocation];
 
@@ -280,14 +202,6 @@ export function MapPage() {
             value={selectedLocation}
             onChange={(value) => setSelectedLocation((value as LocationKey) || 'cassino')}
           />
-
-          <Button
-            variant="default"
-            leftSection={<RotateCcw size={16} />}
-            onClick={reloadWithFreshGeocode}
-          >
-            Recalibrar pins
-          </Button>
         </Group>
       </Card>
 
@@ -311,7 +225,13 @@ export function MapPage() {
           {mapPoints.map(({ property, lat, lng }) => (
             <Marker key={property.id} position={[lat, lng]} icon={defaultIcon}>
               <Popup>
-                <Stack gap={6} miw={190}>
+                <Stack gap={8} miw={220} className="map-popup-card">
+                  <Image
+                    src={property.photos[0] || '/background.png'}
+                    alt={property.title}
+                    className="map-popup-image"
+                    radius="sm"
+                  />
                   <Text fw={700} size="sm">
                     {property.title}
                   </Text>
@@ -321,18 +241,8 @@ export function MapPage() {
                   <Text size="sm">
                     {formatMoney(property.price)} - {property.rent_type}
                   </Text>
-                  <Button
-                    component="a"
-                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                      property.location.addressText || property.title,
-                    )}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    size="xs"
-                    variant="light"
-                    leftSection={<ExternalLink size={14} />}
-                  >
-                    Abrir
+                  <Button component="a" href={`/app/property/${property.id}`} size="xs" radius="md">
+                    Reservar
                   </Button>
                 </Stack>
               </Popup>

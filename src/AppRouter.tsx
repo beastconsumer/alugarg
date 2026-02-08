@@ -6,7 +6,9 @@ import { LoadingScreen } from './components/LoadingScreen';
 import { useAuth } from './state/AuthContext';
 import { AnnouncePage } from './pages/AnnouncePage';
 import { AuthEntryPage } from './pages/AuthEntryPage';
+import { BookingCheckoutPage } from './pages/BookingCheckoutPage';
 import { BookingsPage } from './pages/BookingsPage';
+import { ChatPage } from './pages/ChatPage';
 import { EditPropertyPage } from './pages/EditPropertyPage';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
@@ -53,6 +55,10 @@ export function AppRouter() {
         <Route path="map" element={<MapPage />} />
         <Route path="announce" element={<AnnouncePage />} />
         <Route path="bookings" element={<BookingsPage />} />
+        <Route path="chat" element={<ChatPage />} />
+        <Route path="chat/:conversationId" element={<ChatPage />} />
+        <Route path="checkout" element={<BookingCheckoutPage />} />
+        <Route path="checkout/:bookingId" element={<BookingCheckoutPage />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="property/:id" element={<PropertyDetailPage />} />
         <Route path="edit-property/:id" element={<EditPropertyPage />} />
