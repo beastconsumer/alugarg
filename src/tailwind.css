@@ -4,28 +4,28 @@
 
 @layer base {
   body {
-    @apply bg-slate-950 text-slate-100;
+    @apply bg-brand-off text-brand-text;
   }
 }
 
 @layer components {
   .admin-bg {
-    @apply min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(11,95,255,0.24),transparent_45%),radial-gradient(circle_at_top_right,rgba(15,118,110,0.20),transparent_40%),linear-gradient(180deg,#030712_0%,#020617_100%)];
+    @apply min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(47,91,255,0.16),transparent_45%),radial-gradient(circle_at_top_right,rgba(200,162,74,0.12),transparent_40%),linear-gradient(180deg,#F7F5F2_0%,#EFF3F8_100%)];
   }
 
   .admin-glass {
-    @apply border border-slate-800/80 bg-slate-900/75 backdrop-blur-xl shadow-admin;
+    @apply border border-brand-slate/25 bg-white/85 backdrop-blur-xl shadow-admin;
   }
 
   .admin-title {
-    @apply text-slate-50 tracking-tight;
+    @apply text-brand-text tracking-tight;
   }
 
   .admin-muted {
-    @apply text-slate-400;
+    @apply text-brand-slate;
   }
 
   .admin-kpi {
-    @apply rounded-2xl border border-slate-800 bg-slate-900/80;
+    @apply rounded-2xl border border-brand-slate/20 bg-brand-surface;
   }
 }

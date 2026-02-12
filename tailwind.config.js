@@ -4,11 +4,20 @@ export default {
   theme: {
     extend: {
       colors: {
-        ocean: '#0B5FFF',
-        pine: '#0F766E',
+        brand: {
+          navy: '#0B1F3B',
+          off: '#F7F5F2',
+          text: '#111827',
+          cta: '#2F5BFF',
+          slate: '#64748B',
+          premium: '#C8A24A',
+          danger: '#DC2626',
+          success: '#16A34A',
+          surface: '#F2F4F7',
+        },
       },
       boxShadow: {
-        admin: '0 16px 42px rgba(2, 6, 23, 0.45)',
+        admin: '0 16px 42px rgba(11, 31, 59, 0.22)',
       },
     },
   },

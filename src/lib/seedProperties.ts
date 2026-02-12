@@ -12,6 +12,11 @@ const seedOwners: UserProfile[] = [
     email: 'corretor01@alugaaluga.app',
     birth_date: null,
     role: 'user',
+    host_verification_status: 'verified',
+    host_document_type: '',
+    host_document_front_path: '',
+    host_document_back_path: '',
+    host_verification_submitted_at: null,
     created_at: nowIso,
   },
   {
@@ -23,6 +28,11 @@ const seedOwners: UserProfile[] = [
     email: 'corretor02@alugaaluga.app',
     birth_date: null,
     role: 'user',
+    host_verification_status: 'verified',
+    host_document_type: '',
+    host_document_front_path: '',
+    host_document_back_path: '',
+    host_verification_submitted_at: null,
     created_at: nowIso,
   },
 ];

@@ -2,8 +2,7 @@ import {
   Box,
   Button,
   Container,
-  Group,
-  Image,
+  Divider,
   Paper,
   Stack,
   Text,
@@ -22,43 +21,53 @@ export function AuthEntryPage() {
   }
 
   return (
-    <Box className="auth-hero premium" style={{ backgroundImage: "url('/background.png')" }}>
-      <div className="overlay" />
+    <Box className="auth-gate-shell" style={{ backgroundImage: "url('/background.png')" }}>
+      <div className="auth-gate-overlay" aria-hidden="true" />
 
-      <Container size="sm" className="auth-entry-container">
-        <motion.div initial={{ opacity: 0, y: 28 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: 'easeOut' }}>
-          <Paper className="auth-card glass premium" radius="xl" shadow="xl" p="xl">
+      <Container size="xs" className="auth-gate-container">
+        <motion.div
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, ease: 'easeOut' }}
+        >
+          <Paper className="auth-gate-card" radius="xl" shadow="xl" p="xl">
             <Stack gap="sm">
-              <Group>
-                <Image src="/logoapp.png" alt="Aluga Aluga" className="auth-logo" w={68} h={68} radius="lg" />
-                <div>
-                  <Title order={1} c="white">
-                    Aluga Aluga
-                  </Title>
-                  <Text c="rgba(255,255,255,0.85)" size="sm">
-                    Marketplace local premium do Cassino
-                  </Text>
-                </div>
-              </Group>
+              <div>
+                <Title order={2} className="auth-gate-title">
+                  Entrar ou cadastrar
+                </Title>
+                <Text className="auth-gate-sub">
+                  Crie sua conta em minutos ou entre com seus dados.
+                </Text>
+              </div>
 
-              <Text c="rgba(255,255,255,0.90)">
-                Reserve com seguranca, avalie anfitrioes e gerencie alugueis em tempo real.
+              <Button
+                size="lg"
+                radius="md"
+                className="auth-gate-primary"
+                onClick={() => navigate('/signup')}
+                fullWidth
+              >
+                Criar conta
+              </Button>
+
+              <Button
+                size="lg"
+                radius="md"
+                className="auth-gate-secondary"
+                variant="white"
+                color="dark"
+                onClick={() => navigate('/login')}
+                fullWidth
+              >
+                Ja tenho conta
+              </Button>
+
+              <Divider my="xs" />
+
+              <Text className="auth-gate-fine" size="xs" c="dimmed">
+                Ao continuar, voce concorda com nossos termos e confirma que leu nossa politica de privacidade.
               </Text>
-
-              <Stack gap={10} mt="sm">
-                <Button
-                  size="lg"
-                  radius="md"
-                  variant="gradient"
-                  gradient={{ from: 'ocean.6', to: 'ocean.4', deg: 135 }}
-                  onClick={() => navigate('/signup')}
-                >
-                  Criar conta
-                </Button>
-                <Button size="lg" radius="md" variant="white" color="dark" onClick={() => navigate('/login')}>
-                  Ja tenho conta
-                </Button>
-              </Stack>
             </Stack>
           </Paper>
         </motion.div>

@@ -6,6 +6,7 @@ import {
   Badge,
   Button,
   Card,
+  Divider,
   Group,
   Select,
   SimpleGrid,
@@ -15,7 +16,7 @@ import {
   Textarea,
   Title,
 } from '@mantine/core';
-import { Upload } from 'lucide-react';
+import { LogOut, Star, Upload } from 'lucide-react';
 import { useAuth } from '../state/AuthContext';
 import { formatDate, formatMoney } from '../lib/format';
 import { supabase, uploadImageAndGetPublicUrl } from '../lib/supabase';
@@ -30,6 +31,22 @@ import {
 } from '../lib/types';
 
 const reviewTags = ['Pontual', 'Comunicacao boa', 'Imovel limpo', 'Confiavel', 'Recomendo', 'Check-in facil'];
+
+const bookingStatusLabel: Record<string, string> = {
+  pending_payment: 'Pagamento pendente',
+  pre_checking: 'Pre-checking',
+  confirmed: 'Confirmada',
+  checked_in: 'Check-in',
+  checked_out: 'Check-out',
+  cancelled: 'Cancelada',
+};
+
+const hostVerificationLabel: Record<string, string> = {
+  not_started: 'Nao iniciado',
+  pending: 'Em analise',
+  verified: 'Verificado',
+  rejected: 'Rejeitado',
+};
 
 export function ProfilePage() {
   const { user, profile, refreshProfile, signOut } = useAuth();
@@ -98,6 +115,25 @@ export function ProfilePage() {
     const reviewedBookingIds = new Set(reviewsGiven.map((review) => review.booking_id));
     return myBookings.filter((booking) => booking.status === 'checked_out' && !reviewedBookingIds.has(booking.id));
   }, [myBookings, reviewsGiven]);
+
+  const profileStats = useMemo(() => {
+    const avgRating =
+      receivedReviews.length > 0
+        ? receivedReviews.reduce((acc, item) => acc + item.rating, 0) / receivedReviews.length
+        : 0;
+
+    return {
+      avgRating,
+      activeProperties: myProperties.filter((item) => item.status === 'approved').length,
+      totalBookings: myBookings.length,
+      totalReviews: receivedReviews.length,
+    };
+  }, [myBookings.length, myProperties, receivedReviews]);
+
+  const hostCtaLabel =
+    profile?.host_verification_status === 'verified' || profile?.host_verification_status === 'pending'
+      ? 'Anunciar meu imovel'
+      : 'Torne-se um anfitriao';
 
   const onSaveProfile = async (event: FormEvent) => {
     event.preventDefault();
@@ -193,19 +229,36 @@ export function ProfilePage() {
 
   return (
     <Stack gap="md" py="md" pb={96}>
-      <Card withBorder radius="xl" p="lg">
-        <Stack gap="xs">
-          <Title order={2}>Perfil</Title>
-          <Text c="dimmed">Gerencie seus dados, anuncios, reservas e avaliacoes.</Text>
-        </Stack>
-      </Card>
+      <Group justify="space-between" align="center">
+        <Title order={2}>Perfil</Title>
+        <Button color="red" variant="light" leftSection={<LogOut size={16} />} onClick={() => void signOut()}>
+          Sair
+        </Button>
+      </Group>
 
       {errorMessage ? <Alert color="red">{errorMessage}</Alert> : null}
 
-      <Card withBorder radius="xl" p="lg">
+      <Card withBorder radius="xl" p="lg" className="profile-mobile-id-card">
         <Stack gap="md">
-          <Group>
-            <Avatar src={profile?.avatar_url || '/logoapp.png'} size={72} radius="xl" />
+          <Group justify="space-between" align="flex-start" wrap="wrap">
+            <Group gap="md" wrap="nowrap">
+              <div className="profile-mobile-avatar-wrap">
+                <Avatar src={profile?.avatar_url || '/logoapp.png'} size={92} radius="50%" />
+                <span className="profile-mobile-verify-dot" aria-hidden />
+              </div>
+              <Stack gap={3}>
+                <Title order={2} className="profile-mobile-name">
+                  {profile?.name || 'Perfil'}
+                </Title>
+                <Text size="sm" c="dimmed">
+                  {profile?.email || '-'}
+                </Text>
+                <Badge variant="light">
+                  Validacao anfitriao: {hostVerificationLabel[profile?.host_verification_status || 'not_started']}
+                </Badge>
+              </Stack>
+            </Group>
+
             <label>
               <Button component="span" variant="light" leftSection={<Upload size={16} />} loading={avatarUploading}>
                 Alterar foto
@@ -214,49 +267,99 @@ export function ProfilePage() {
             </label>
           </Group>
 
-          <form onSubmit={onSaveProfile}>
-            <Stack gap="md">
-              <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
-                <TextInput label="Nome" value={name} onChange={(event) => setName(event.currentTarget.value)} required />
-                <TextInput label="Telefone" value={phone} onChange={(event) => setPhone(event.currentTarget.value)} required />
-              </SimpleGrid>
-
-              <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
-                <TextInput label="CPF" value={cpf} onChange={(event) => setCpf(event.currentTarget.value)} />
-                <TextInput label="Data nascimento (YYYY-MM-DD)" value={birthDate} onChange={(event) => setBirthDate(event.currentTarget.value)} />
-              </SimpleGrid>
-
-              <TextInput label="Email (login)" value={profile?.email || ''} readOnly />
-
-              <Group grow>
-                <Button type="submit" loading={savingProfile}>
-                  Salvar perfil
-                </Button>
-                <Button color="red" variant="light" onClick={() => void signOut()}>
-                  Sair
-                </Button>
-              </Group>
-            </Stack>
-          </form>
-
-          {profile?.role === 'admin' ? (
-            <Button component="a" href="/admin.html" target="_blank" rel="noreferrer" variant="default">
-              Abrir painel admin web
-            </Button>
-          ) : null}
+          <Button component={Link} to="/app/announce" fullWidth>
+            {hostCtaLabel}
+          </Button>
         </Stack>
       </Card>
 
-      <Card withBorder radius="xl" p="lg">
-        <Stack gap="md">
-          <Title order={3}>Meus anuncios</Title>
-          {loadingData ? <Text c="dimmed">Carregando...</Text> : null}
-          {myProperties.length === 0 ? <Text c="dimmed">Sem anuncios ainda.</Text> : null}
+      <SimpleGrid cols={{ base: 1, sm: 4 }} spacing="md">
+        <Card withBorder radius="xl" p="md" className="profile-section-card">
+          <Text size="sm" c="dimmed">
+            Anuncios ativos
+          </Text>
+          <Title order={3}>{profileStats.activeProperties}</Title>
+        </Card>
+        <Card withBorder radius="xl" p="md" className="profile-section-card">
+          <Text size="sm" c="dimmed">
+            Reservas
+          </Text>
+          <Title order={3}>{profileStats.totalBookings}</Title>
+        </Card>
+        <Card withBorder radius="xl" p="md" className="profile-section-card">
+          <Text size="sm" c="dimmed">
+            Avaliacoes
+          </Text>
+          <Title order={3}>{profileStats.totalReviews}</Title>
+        </Card>
+        <Card withBorder radius="xl" p="md" className="profile-section-card">
+          <Text size="sm" c="dimmed">
+            Nota media
+          </Text>
+          <Title order={3}>{profileStats.avgRating > 0 ? profileStats.avgRating.toFixed(1) : '-'}</Title>
+        </Card>
+      </SimpleGrid>
 
-          {myProperties.map((property) => (
-            <Card key={property.id} withBorder radius="lg" p="md">
-              <Group justify="space-between" align="flex-start">
-                <div>
+      <Card withBorder radius="xl" p="lg" className="profile-section-card">
+        <Stack gap="md">
+          <Title order={4}>Dados da conta</Title>
+
+          <form onSubmit={onSaveProfile}>
+            <Stack gap="md">
+              <TextInput label="Nome" value={name} onChange={(event) => setName(event.currentTarget.value)} required />
+              <TextInput label="Telefone" value={phone} onChange={(event) => setPhone(event.currentTarget.value)} required />
+              <TextInput label="CPF" value={cpf} onChange={(event) => setCpf(event.currentTarget.value)} />
+              <TextInput
+                label="Nascimento (YYYY-MM-DD)"
+                value={birthDate}
+                onChange={(event) => setBirthDate(event.currentTarget.value)}
+              />
+              <TextInput label="Email" value={profile?.email || ''} readOnly />
+
+              <Button type="submit" loading={savingProfile}>
+                Salvar dados
+              </Button>
+            </Stack>
+          </form>
+        </Stack>
+      </Card>
+
+      <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
+        <Card withBorder radius="xl" p="lg" className="profile-section-card">
+          <Stack gap="md">
+            <Title order={4}>Minhas reservas</Title>
+            {myBookings.length === 0 ? <Text c="dimmed">Nenhuma reserva ainda.</Text> : null}
+
+            {myBookings.slice(0, 3).map((booking) => (
+              <Card key={booking.id} withBorder radius="lg" p="md" className="profile-air-list-card">
+                <Stack gap={4}>
+                  <Text fw={700}>{booking.property_title}</Text>
+                  <Text size="sm" c="dimmed">
+                    {formatDate(booking.check_in_date)} ate {formatDate(booking.check_out_date)}
+                  </Text>
+                  <Group justify="space-between" align="center">
+                    <Text size="sm">Total: {formatMoney(booking.total_paid_by_renter)}</Text>
+                    <Badge variant="light">{bookingStatusLabel[booking.status] || booking.status}</Badge>
+                  </Group>
+                </Stack>
+              </Card>
+            ))}
+
+            <Button component={Link} to="/app/bookings" variant="default">
+              Abrir todas as reservas
+            </Button>
+          </Stack>
+        </Card>
+
+        <Card withBorder radius="xl" p="lg" className="profile-section-card">
+          <Stack gap="md">
+            <Title order={4}>Meus anuncios</Title>
+            {loadingData ? <Text c="dimmed">Carregando...</Text> : null}
+            {myProperties.length === 0 ? <Text c="dimmed">Sem anuncios ainda.</Text> : null}
+
+            {myProperties.slice(0, 3).map((property) => (
+              <Card key={property.id} withBorder radius="lg" p="md" className="profile-air-list-card">
+                <Stack gap={4}>
                   <Text fw={700}>{property.title}</Text>
                   <Text size="sm" c="dimmed">
                     {property.location.addressText || 'Sem endereco'}
@@ -264,45 +367,24 @@ export function ProfilePage() {
                   <Text size="sm">
                     {formatMoney(property.price)} - {statusLabel[property.status]}
                   </Text>
-                </div>
+                  <Group>
+                    <Button component={Link} to={`/app/property/${property.id}`} variant="default" size="xs">
+                      Ver
+                    </Button>
+                    <Button component={Link} to={`/app/edit-property/${property.id}`} size="xs">
+                      Editar
+                    </Button>
+                  </Group>
+                </Stack>
+              </Card>
+            ))}
+          </Stack>
+        </Card>
+      </SimpleGrid>
 
-                <Group>
-                  <Button component={Link} to={`/app/property/${property.id}`} variant="default" size="xs">
-                    Ver
-                  </Button>
-                  <Button component={Link} to={`/app/edit-property/${property.id}`} size="xs">
-                    Editar
-                  </Button>
-                </Group>
-              </Group>
-            </Card>
-          ))}
-        </Stack>
-      </Card>
-
-      <Card withBorder radius="xl" p="lg">
+      <Card withBorder radius="xl" p="lg" className="profile-section-card">
         <Stack gap="md">
-          <Title order={3}>Casas alugadas por voce</Title>
-          {myBookings.length === 0 ? <Text c="dimmed">Nenhuma reserva ainda.</Text> : null}
-
-          {myBookings.map((booking) => (
-            <Card key={booking.id} withBorder radius="lg" p="md">
-              <Stack gap={4}>
-                <Text fw={700}>{booking.property_title}</Text>
-                <Text size="sm" c="dimmed">
-                  {formatDate(booking.check_in_date)} ate {formatDate(booking.check_out_date)}
-                </Text>
-                <Text size="sm">Total: {formatMoney(booking.total_paid_by_renter)}</Text>
-                <Badge variant="light">Status: {booking.status}</Badge>
-              </Stack>
-            </Card>
-          ))}
-        </Stack>
-      </Card>
-
-      <Card withBorder radius="xl" p="lg">
-        <Stack gap="md">
-          <Title order={3}>Avaliar proprietario (apos check-out)</Title>
+          <Title order={4}>Avaliacoes</Title>
 
           {pendingReviewBookings.length === 0 ? (
             <Text c="dimmed">Sem locacoes finalizadas pendentes de avaliacao.</Text>
@@ -360,29 +442,20 @@ export function ProfilePage() {
               </Stack>
             </form>
           )}
-        </Stack>
-      </Card>
 
-      <Card withBorder radius="xl" p="lg">
-        <Stack gap="md">
-          <Title order={3}>Avaliacoes recebidas como proprietario</Title>
+          <Divider />
 
-          {receivedReviews.length === 0 ? <Text c="dimmed">Nenhuma avaliacao recebida ainda.</Text> : null}
-
-          {receivedReviews.map((review) => (
-            <Card key={review.id} withBorder radius="lg" p="md">
+          <Title order={5}>Ultimas recebidas ({receivedReviews.length})</Title>
+          {receivedReviews.length === 0 ? <Text c="dimmed">Voce ainda nao recebeu avaliacoes.</Text> : null}
+          {receivedReviews.slice(0, 3).map((review) => (
+            <Card key={review.id} withBorder radius="lg" p="md" className="profile-air-list-card">
               <Stack gap={6}>
-                <Text fw={700}>Nota: {review.rating}/5</Text>
+                <Text fw={700}>
+                  <Star size={14} style={{ verticalAlign: 'middle' }} /> Nota: {review.rating}/5
+                </Text>
                 <Text size="sm" c="dimmed">
                   {review.comment || 'Sem comentario'}
                 </Text>
-                <Group gap="xs" wrap="wrap">
-                  {review.tags.map((tag) => (
-                    <Badge key={tag} variant="light" color="teal">
-                      {tag}
-                    </Badge>
-                  ))}
-                </Group>
               </Stack>
             </Card>
           ))}

@@ -1,6 +1,6 @@
 import { Badge, Card, Group, Image, Stack, Text, ThemeIcon } from '@mantine/core';
 import { motion } from 'framer-motion';
-import { Heart, Star } from 'lucide-react';
+import { ArrowUpRight, Heart, Star } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { formatMoney } from '../lib/format';
 import { Property } from '../lib/types';
@@ -26,22 +26,29 @@ export function PropertyCard({ property }: { property: Property }) {
       className="home-listing-item"
       initial={{ opacity: 0, y: 18 }}
       animate={{ opacity: 1, y: 0 }}
+      whileHover={{ y: -4 }}
       transition={{ duration: 0.22, ease: 'easeOut' }}
     >
       <Card component={Link} to={`/app/property/${property.id}`} withBorder radius="xl" p={0} className="home-listing-card">
         <div className="home-listing-image-wrap">
           <Image src={cover} alt={property.title} className="home-listing-image" />
           <Group className="home-listing-overlay-top" justify="space-between" wrap="nowrap">
-            <Badge radius="xl" variant="filled" color="gray">
+            <Badge radius="xl" variant="filled" color="dark">
               {property.verified ? 'Preferido dos hospedes' : 'Nova opcao'}
             </Badge>
-            <ThemeIcon size={28} radius="xl" color="dark" variant="gradient" gradient={{ from: '#3f3f46', to: '#111827', deg: 135 }}>
+            <ThemeIcon
+              size={30}
+              radius="xl"
+              color="dark"
+              variant="gradient"
+              gradient={{ from: '#283248', to: '#111827', deg: 135 }}
+            >
               <Heart size={14} />
             </ThemeIcon>
           </Group>
         </div>
 
-        <Stack gap={2} p="xs" className="home-listing-meta">
+        <Stack gap={3} p="sm" className="home-listing-meta">
           <Text fw={700} lineClamp={1}>
             {property.title}
           </Text>
@@ -50,18 +57,16 @@ export function PropertyCard({ property }: { property: Property }) {
             {property.location.addressText || 'Balneario Cassino'}
           </Text>
 
-          <Group gap={5} wrap="nowrap">
-            <Text size="sm" fw={600}>
+          <Group justify="space-between" align="center" wrap="nowrap">
+            <Text size="sm" fw={700}>
               {formatMoney(property.price)} {getPriceContext(property.rent_type)}
-            </Text>
-            <Text size="sm" c="dimmed">
-              •
             </Text>
             <Group gap={3} wrap="nowrap">
               <Star size={13} fill="currentColor" />
               <Text size="sm" fw={600}>
                 {rating}
               </Text>
+              <ArrowUpRight size={13} />
             </Group>
           </Group>
         </Stack>

@@ -14,11 +14,22 @@ export const supabase = createClient(
   },
 );
 
+const compressImage = async (
+  file: File,
+  options: Parameters<typeof imageCompression>[1],
+): Promise<File | Blob> => {
+  try {
+    return await imageCompression(file, options);
+  } catch {
+    return file;
+  }
+};
+
 export const uploadImageAndGetPublicUrl = async (
   file: File,
   storagePath: string,
 ): Promise<string> => {
-  const compressed = await imageCompression(file, {
+  const compressed = await compressImage(file, {
     maxSizeMB: 1,
     maxWidthOrHeight: 1920,
     useWebWorker: true,
@@ -28,7 +39,7 @@ export const uploadImageAndGetPublicUrl = async (
   const { error: uploadError } = await supabase.storage
     .from(env.supabaseBucket)
     .upload(storagePath, compressed, {
-      contentType: compressed.type,
+      contentType: compressed.type || file.type || 'image/jpeg',
       upsert: false,
     });
 
@@ -38,6 +49,32 @@ export const uploadImageAndGetPublicUrl = async (
 
   const { data } = supabase.storage.from(env.supabaseBucket).getPublicUrl(storagePath);
   return data.publicUrl;
+};
+
+export const uploadPrivateDocumentAndGetPath = async (
+  file: File,
+  storagePath: string,
+  bucket = 'host-documents',
+): Promise<string> => {
+  const compressed = await compressImage(file, {
+    maxSizeMB: 2,
+    maxWidthOrHeight: 2000,
+    useWebWorker: true,
+    initialQuality: 0.9,
+  });
+
+  const { error: uploadError } = await supabase.storage
+    .from(bucket)
+    .upload(storagePath, compressed, {
+      contentType: compressed.type || file.type || 'image/jpeg',
+      upsert: true,
+    });
+
+  if (uploadError) {
+    throw uploadError;
+  }
+
+  return storagePath;
 };
 
 export const extractBucketPathFromPublicUrl = (url: string): string | null => {

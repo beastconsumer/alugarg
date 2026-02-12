@@ -4,6 +4,17 @@ import { resolve } from 'node:path';
 
 export default defineConfig({
   plugins: [react()],
+  server: {
+    // We bind to localhost in scripts, but tunnels (trycloudflare) forward a different Host header.
+    // Allow it for local dev/share links.
+    allowedHosts: true,
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:8787',
+        changeOrigin: true,
+      },
+    },
+  },
   build: {
     rollupOptions: {
       input: {

@@ -7,6 +7,7 @@ export type BookingStatus =
   | 'checked_in'
   | 'checked_out'
   | 'cancelled';
+export type HostVerificationStatus = 'not_started' | 'pending' | 'verified' | 'rejected';
 
 export interface PropertyLocation {
   lat: number | null;
@@ -57,6 +58,11 @@ export interface UserProfile {
   email: string;
   birth_date: string | null;
   role: 'user' | 'admin';
+  host_verification_status: HostVerificationStatus;
+  host_document_type: 'rg' | 'cnh' | '';
+  host_document_front_path: string;
+  host_document_back_path: string;
+  host_verification_submitted_at: string | null;
   created_at: string;
 }
 
@@ -183,6 +189,13 @@ export const parseProfile = (raw: Record<string, unknown>): UserProfile => ({
   email: String(raw.email ?? ''),
   birth_date: raw.birth_date ? String(raw.birth_date) : null,
   role: (String(raw.role ?? 'user') as 'user' | 'admin'),
+  host_verification_status: (String(raw.host_verification_status ?? 'not_started') as HostVerificationStatus),
+  host_document_type: (String(raw.host_document_type ?? '') as 'rg' | 'cnh' | ''),
+  host_document_front_path: String(raw.host_document_front_path ?? ''),
+  host_document_back_path: String(raw.host_document_back_path ?? ''),
+  host_verification_submitted_at: raw.host_verification_submitted_at
+    ? String(raw.host_verification_submitted_at)
+    : null,
   created_at: String(raw.created_at ?? ''),
 });
 

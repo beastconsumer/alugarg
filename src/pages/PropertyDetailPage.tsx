@@ -101,6 +101,9 @@ export function PropertyDetailPage() {
   const [checkOutDate, setCheckOutDate] = useState('');
   const [guestCount, setGuestCount] = useState(1);
   const [bookingError, setBookingError] = useState('');
+  const [availabilityNotice, setAvailabilityNotice] = useState('');
+  const [checkingAvailability, setCheckingAvailability] = useState(false);
+  const [isDateRangeAvailable, setIsDateRangeAvailable] = useState(true);
   const [showAllAmenities, setShowAllAmenities] = useState(false);
   const [showAllPhotosModal, setShowAllPhotosModal] = useState(false);
 
@@ -180,6 +183,73 @@ export function PropertyDetailPage() {
     };
   }, [property, units]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const validateAvailability = async () => {
+      if (!property || !checkInDate || !checkOutDate) {
+        setAvailabilityNotice('');
+        setIsDateRangeAvailable(true);
+        setCheckingAvailability(false);
+        return;
+      }
+
+      if (units <= 0) {
+        setAvailabilityNotice('');
+        setIsDateRangeAvailable(true);
+        setCheckingAvailability(false);
+        return;
+      }
+
+      setCheckingAvailability(true);
+      setAvailabilityNotice('');
+
+      try {
+        const checkInIso = new Date(`${checkInDate}T12:00:00`).toISOString();
+        const checkOutIso = new Date(`${checkOutDate}T12:00:00`).toISOString();
+
+        const { data, error } = await supabase
+          .from('bookings')
+          .select('id, check_in_date, check_out_date, status')
+          .eq('property_id', property.id)
+          .in('status', ['pending_payment', 'pre_checking', 'confirmed', 'checked_in']);
+
+        if (error) throw error;
+
+        const hasConflict = (data ?? []).some((row) => {
+          const existingStart = new Date(String(row.check_in_date));
+          const existingEnd = new Date(String(row.check_out_date));
+          return existingStart < new Date(checkOutIso) && existingEnd > new Date(checkInIso);
+        });
+
+        if (cancelled) return;
+
+        if (hasConflict) {
+          setIsDateRangeAvailable(false);
+          setAvailabilityNotice('Periodo indisponivel: este imovel ja foi reservado nessas datas.');
+          return;
+        }
+
+        setIsDateRangeAvailable(true);
+        setAvailabilityNotice('Datas disponiveis para reserva.');
+      } catch {
+        if (cancelled) return;
+        setIsDateRangeAvailable(false);
+        setAvailabilityNotice('Nao foi possivel validar disponibilidade agora. Tente novamente.');
+      } finally {
+        if (!cancelled) {
+          setCheckingAvailability(false);
+        }
+      }
+    };
+
+    void validateAvailability();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [checkInDate, checkOutDate, property, units]);
+
   const onCreateBooking = (event: FormEvent) => {
     event.preventDefault();
 
@@ -200,6 +270,16 @@ export function PropertyDetailPage() {
 
     if (guestCount > property.guests_capacity) {
       setBookingError(`Este imovel suporta no maximo ${property.guests_capacity} hospede(s).`);
+      return;
+    }
+
+    if (checkingAvailability) {
+      setBookingError('Validando disponibilidade das datas. Aguarde alguns segundos.');
+      return;
+    }
+
+    if (!isDateRangeAvailable) {
+      setBookingError('Periodo indisponivel. Escolha outras datas para continuar.');
       return;
     }
 
@@ -483,9 +563,13 @@ export function PropertyDetailPage() {
                     </Text>
                   </Card>
 
+                  {availabilityNotice ? (
+                    <Alert color={isDateRangeAvailable ? 'teal' : 'red'}>{availabilityNotice}</Alert>
+                  ) : null}
+
                   {bookingError ? <Alert color="red">{bookingError}</Alert> : null}
 
-                  <Button type="submit" className="detail-reserve-btn">
+                  <Button type="submit" className="detail-reserve-btn" disabled={checkingAvailability || !isDateRangeAvailable}>
                     Reservar e pagar
                   </Button>
 

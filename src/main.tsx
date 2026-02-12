@@ -6,6 +6,7 @@ import { Notifications } from '@mantine/notifications';
 import { AppRouter } from './AppRouter';
 import { AuthProvider } from './state/AuthContext';
 import { appTheme } from './theme';
+import './tailwind.css';
 import './styles.css';
 import '@mantine/core/styles.css';
 import '@mantine/dates/styles.css';

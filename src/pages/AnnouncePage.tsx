@@ -6,6 +6,7 @@ import {
   Badge,
   Button,
   Card,
+  Checkbox,
   FileInput,
   Group,
   MultiSelect,
@@ -23,8 +24,9 @@ import {
 import { ImagePlus, Star, Trash2 } from 'lucide-react';
 import { useAuth } from '../state/AuthContext';
 import { env } from '../env';
+import { formatDate } from '../lib/format';
 import { formatCep, isValidCep, resolveLocationFromCepAddress, sanitizeCep } from '../lib/location';
-import { uploadImageAndGetPublicUrl, supabase } from '../lib/supabase';
+import { uploadImageAndGetPublicUrl, uploadPrivateDocumentAndGetPath, supabase } from '../lib/supabase';
 import { amenityOptions } from '../lib/propertyCatalog';
 import { RentType } from '../lib/types';
 
@@ -43,11 +45,17 @@ const createPhotoDrafts = (files: File[]): DraftPhoto[] =>
 
 export function AnnouncePage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
 
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [documentType, setDocumentType] = useState<'rg' | 'cnh'>('rg');
+  const [documentFront, setDocumentFront] = useState<File | null>(null);
+  const [documentBack, setDocumentBack] = useState<File | null>(null);
+  const [submittingDocuments, setSubmittingDocuments] = useState(false);
+  const [acceptHostRules, setAcceptHostRules] = useState(false);
+  const [forceDocUpload, setForceDocUpload] = useState(false);
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -75,6 +83,16 @@ export function AnnouncePage() {
   const [cep, setCep] = useState('');
 
   const [photos, setPhotos] = useState<DraftPhoto[]>([]);
+
+  const hostStatus = profile?.host_verification_status ?? 'not_started';
+  const hasDocuments = Boolean(
+    profile?.host_document_front_path && profile?.host_document_back_path,
+  );
+  const isVerifiedHost = hostStatus === 'verified' && hasDocuments;
+  const isPendingHost = hostStatus === 'pending';
+  const isRejectedHost = hostStatus === 'rejected';
+  const showDocumentForm = forceDocUpload || hostStatus === 'not_started' || isRejectedHost;
+  const hostJourneyStep = isVerifiedHost ? 2 : isPendingHost ? 1 : 0;
 
   useEffect(() => {
     return () => {
@@ -125,9 +143,80 @@ export function AnnouncePage() {
     return true;
   }, [addressText, description, guestsCapacity, minimumNights, price, step, title]);
 
+  const getFileExtension = (file: File): string => {
+    const fromName = file.name.split('.').pop()?.toLowerCase() ?? '';
+    if (fromName) return fromName.replace(/[^a-z0-9]/g, '') || 'jpg';
+    if (file.type.includes('png')) return 'png';
+    if (file.type.includes('webp')) return 'webp';
+    return 'jpg';
+  };
+
+  const submitHostDocuments = async () => {
+    if (!user) {
+      setErrorMessage('Sessao expirada. Entre novamente.');
+      return;
+    }
+
+    if (!documentFront || !documentBack) {
+      setErrorMessage('Envie frente e verso do documento.');
+      return;
+    }
+
+    if (!acceptHostRules) {
+      setErrorMessage('Voce precisa aceitar as regras para se tornar anfitriao.');
+      return;
+    }
+
+    setSubmittingDocuments(true);
+    setErrorMessage('');
+
+    try {
+      const stamp = Date.now();
+      const frontPath = `${user.id}/host-documents/${stamp}-front.${getFileExtension(documentFront)}`;
+      const backPath = `${user.id}/host-documents/${stamp}-back.${getFileExtension(documentBack)}`;
+
+      await uploadPrivateDocumentAndGetPath(documentFront, frontPath);
+      await uploadPrivateDocumentAndGetPath(documentBack, backPath);
+
+      const { error } = await supabase
+        .from('users')
+        .update({
+          host_verification_status: 'pending',
+          host_document_type: documentType,
+          host_document_front_path: frontPath,
+          host_document_back_path: backPath,
+          host_verification_submitted_at: new Date().toISOString(),
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      await refreshProfile();
+      setDocumentFront(null);
+      setDocumentBack(null);
+      setForceDocUpload(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Falha ao enviar documentos';
+      if (message.toLowerCase().includes('bucket')) {
+        setErrorMessage('Bucket host-documents nao encontrado no Supabase Storage.');
+      } else if (message.toLowerCase().includes('row level security') || message.toLowerCase().includes('permission')) {
+        setErrorMessage('Sem permissao para enviar documentos. Entre novamente e tente de novo.');
+      } else {
+        setErrorMessage(message);
+      }
+    } finally {
+      setSubmittingDocuments(false);
+    }
+  };
+
   const publishProperty = async () => {
     if (!user) {
       setErrorMessage('Sessao expirada. Entre novamente.');
+      return;
+    }
+
+    if (!isVerifiedHost) {
+      setErrorMessage('Aguarde a confirmacao dos documentos antes de anunciar.');
       return;
     }
 
@@ -200,6 +289,183 @@ export function AnnouncePage() {
       setLoading(false);
     }
   };
+
+  if (!isVerifiedHost) {
+    return (
+      <Stack gap="md" py="md" pb={96}>
+        <Card withBorder radius="xl" p="lg" className="host-hero-card">
+          <Stack gap={6}>
+            <Badge color="dark" variant="light">
+              Anfitriao Aluga Aluga
+            </Badge>
+            <Title order={2} className="host-hero-title">
+              Que legal que voce quer se tornar um anfitriao.
+            </Title>
+            <Text c="dimmed">
+              Vamos seguir um passo a passo simples: enviar documentos, aguardar confirmacao e depois cadastrar sua casa.
+            </Text>
+          </Stack>
+        </Card>
+
+        <Card withBorder radius="xl" p="lg" className="host-onboard-card">
+          <Stack gap="lg">
+            <Stack gap="xs">
+              <Title order={4}>Sua jornada de anfitriao</Title>
+              <Text size="sm" c="dimmed">
+                Cada etapa libera a proxima. Assim garantimos seguranca e qualidade para todos.
+              </Text>
+            </Stack>
+
+            <Stepper active={hostJourneyStep} allowNextStepsSelect={false} iconPosition="left">
+              <Stepper.Step label="Enviar documentos" description="RG ou CNH frente e verso" />
+              <Stepper.Step label="Aguardar confirmacao" description="Analise da equipe" />
+              <Stepper.Step label="Cadastrar a casa" description="Complete o anuncio" />
+            </Stepper>
+
+            <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="sm">
+              <Card withBorder radius="lg" p="md" className="host-step-card">
+                <Group gap="sm" wrap="nowrap">
+                  <div className="host-step-index">1</div>
+                  <div>
+                    <Text fw={700}>Documento valido</Text>
+                    <Text size="sm" c="dimmed">RG ou CNH com foto legivel.</Text>
+                  </div>
+                </Group>
+              </Card>
+              <Card withBorder radius="lg" p="md" className="host-step-card">
+                <Group gap="sm" wrap="nowrap">
+                  <div className="host-step-index">2</div>
+                  <div>
+                    <Text fw={700}>Fotos nítidas</Text>
+                    <Text size="sm" c="dimmed">Sem reflexo, sem cortes e sem filtro.</Text>
+                  </div>
+                </Group>
+              </Card>
+              <Card withBorder radius="lg" p="md" className="host-step-card">
+                <Group gap="sm" wrap="nowrap">
+                  <div className="host-step-index">3</div>
+                  <div>
+                    <Text fw={700}>Confirmacao e anuncio</Text>
+                    <Text size="sm" c="dimmed">Validacao em ate 24h uteis.</Text>
+                  </div>
+                </Group>
+              </Card>
+            </SimpleGrid>
+          </Stack>
+        </Card>
+
+        {isPendingHost && !forceDocUpload ? (
+          <Card withBorder radius="xl" p="lg" className="host-waiting-card">
+            <Stack gap="sm">
+              <Group justify="space-between" wrap="wrap">
+                <Stack gap={2}>
+                  <Title order={4} className="host-hero-title">
+                    Documentos recebidos
+                  </Title>
+                  <Text size="sm" c="dimmed">
+                    Estamos analisando sua identidade. Em breve liberamos o cadastro do imovel.
+                  </Text>
+                </Stack>
+                <Badge color="yellow" variant="light">
+                  Em analise
+                </Badge>
+              </Group>
+              <Text size="sm" c="dimmed">
+                Enviado em {profile?.host_verification_submitted_at ? formatDate(profile.host_verification_submitted_at) : 'data indefinida'}.
+              </Text>
+              <Alert color="blue" variant="light">
+                Assim que a verificacao for aprovada, voce podera cadastrar sua casa e publicar o anuncio.
+              </Alert>
+              <Button variant="default" onClick={() => setForceDocUpload(true)}>
+                Reenviar documentos
+              </Button>
+            </Stack>
+          </Card>
+        ) : null}
+
+        {showDocumentForm ? (
+          <Card withBorder radius="xl" p="lg" className="host-onboard-card">
+            <Stack gap="lg">
+              <Stack gap={6}>
+                <Title order={4}>Antes de anunciar, precisamos validar sua identidade</Title>
+                <Text c="dimmed">
+                  Isso ajuda a manter a plataforma segura para hospedes e anfitrioes.
+                </Text>
+              </Stack>
+
+              {isRejectedHost ? (
+                <Alert color="red" variant="light">
+                  Seus documentos foram recusados. Envie novas fotos nítidas para continuar.
+                </Alert>
+              ) : null}
+
+              <Card withBorder radius="lg" p="md" className="host-onboard-rules">
+                <Stack gap="xs">
+                  <Text fw={700}>Regras do anfitriao</Text>
+                  <Text size="sm" c="dimmed">
+                    Ao anunciar, voce concorda com:
+                  </Text>
+                  <ul className="host-onboard-list">
+                    <li>Respeitar as regras de condominio e vizinhanca.</li>
+                    <li>Manter o anuncio atualizado com fotos reais.</li>
+                    <li>Responder mensagens em tempo razoavel.</li>
+                    <li>Oferecer check-in claro e seguro.</li>
+                  </ul>
+                </Stack>
+              </Card>
+
+              <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+                <Select
+                  label="Documento"
+                  data={[
+                    { value: 'rg', label: 'RG' },
+                    { value: 'cnh', label: 'CNH' },
+                  ]}
+                  value={documentType}
+                  onChange={(value) => setDocumentType((value as 'rg' | 'cnh') || 'rg')}
+                  required
+                />
+
+                <Checkbox
+                  label="Li e aceito as regras para anunciar"
+                  checked={acceptHostRules}
+                  onChange={(event) => setAcceptHostRules(event.currentTarget.checked)}
+                />
+              </SimpleGrid>
+
+              <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+                <FileInput
+                  label="Documento - frente"
+                  value={documentFront}
+                  onChange={setDocumentFront}
+                  accept="image/*"
+                  required
+                />
+
+                <FileInput
+                  label="Documento - verso"
+                  value={documentBack}
+                  onChange={setDocumentBack}
+                  accept="image/*"
+                  required
+                />
+              </SimpleGrid>
+
+              <Alert color="blue" variant="light">
+                As imagens serao salvas no Supabase Storage para validacao de anfitriao.
+              </Alert>
+
+              {errorMessage ? <Alert color="red">{errorMessage}</Alert> : null}
+
+              <Button loading={submittingDocuments} onClick={() => void submitHostDocuments()}>
+                Enviar documentos e continuar
+              </Button>
+            </Stack>
+          </Card>
+        ) : null}
+      </Stack>
+    );
+  }
 
   return (
     <Stack gap="md" py="md" pb={96}>

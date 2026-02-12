@@ -15,6 +15,7 @@ import { DatePicker, type DatesRangeValue } from '@mantine/dates';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { BellRing, Building2, Minus, PartyPopper, Plus, Search } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { PropertyCard } from '../components/PropertyCard';
 import { seedProperties } from '../lib/seedProperties';
 import { supabase } from '../lib/supabase';
@@ -247,9 +248,9 @@ export function HomePage() {
               </button>
             </Group>
 
-            <Text size="sm" fw={600} c="dimmed" className="home-air-host-cta">
+            <Button component={Link} to="/app/announce" variant="default" radius="xl" className="home-air-host-btn">
               Torne-se um anfitriao
-            </Text>
+            </Button>
           </Group>
 
           <div className="home-air-search-wrap">

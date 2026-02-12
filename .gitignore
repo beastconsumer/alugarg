@@ -16,3 +16,8 @@ dist/
 # Local temp
 .qodo/
 *.log
+.share_pids.txt
+.tools/
+local-api/.pix-store.json
+supabase/.temp/
+supabase/supabase/

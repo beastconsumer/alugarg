@@ -30,6 +30,11 @@ create table if not exists public.users (
   email text not null default '',
   birth_date date,
   role text not null default 'user',
+  host_verification_status text not null default 'not_started',
+  host_document_type text not null default '',
+  host_document_front_path text not null default '',
+  host_document_back_path text not null default '',
+  host_verification_submitted_at timestamptz,
   created_at timestamptz not null default now()
 );
 
@@ -37,6 +42,11 @@ alter table public.users add column if not exists cpf text not null default '';
 alter table public.users add column if not exists email text not null default '';
 alter table public.users add column if not exists birth_date date;
 alter table public.users add column if not exists avatar_url text not null default '';
+alter table public.users add column if not exists host_verification_status text not null default 'not_started';
+alter table public.users add column if not exists host_document_type text not null default '';
+alter table public.users add column if not exists host_document_front_path text not null default '';
+alter table public.users add column if not exists host_document_back_path text not null default '';
+alter table public.users add column if not exists host_verification_submitted_at timestamptz;
 
 alter table public.users enable row level security;
 
@@ -327,6 +337,70 @@ with check (auth.uid() = owner_id);
 
 create policy "Admins manage all bookings"
 on public.bookings
+for all
+using (public.is_admin())
+with check (public.is_admin());
+
+-- Payment transactions (Mercado Pago PIX)
+create table if not exists public.payment_transactions (
+  id uuid primary key default gen_random_uuid(),
+  booking_id uuid not null,
+  provider text not null default 'mercadopago',
+  provider_payment_id text not null,
+  payment_method text not null default 'pix',
+  amount integer not null default 0,
+  status text not null default 'pending',
+  status_detail text not null default '',
+  payer_email text not null default '',
+  qr_code text not null default '',
+  qr_code_base64 text not null default '',
+  ticket_url text not null default '',
+  raw_response jsonb not null default '{}'::jsonb,
+  paid_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint payment_transactions_provider_payment_id_unique unique (provider_payment_id),
+  constraint payment_transactions_amount_non_negative check (amount >= 0)
+);
+
+create index if not exists payment_transactions_booking_created_idx
+  on public.payment_transactions (booking_id, created_at desc);
+create index if not exists payment_transactions_status_created_idx
+  on public.payment_transactions (status, created_at desc);
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'payment_transactions_booking_id_fkey'
+  ) then
+    alter table public.payment_transactions
+      add constraint payment_transactions_booking_id_fkey
+      foreign key (booking_id) references public.bookings(id) on delete cascade;
+  end if;
+end;
+$$;
+
+alter table public.payment_transactions enable row level security;
+
+drop policy if exists "Participants read own payment transactions" on public.payment_transactions;
+drop policy if exists "Admins manage all payment transactions" on public.payment_transactions;
+
+create policy "Participants read own payment transactions"
+on public.payment_transactions
+for select
+using (
+  exists (
+    select 1
+    from public.bookings b
+    where b.id = booking_id
+      and (auth.uid() = b.renter_id or auth.uid() = b.owner_id)
+  )
+);
+
+create policy "Admins manage all payment transactions"
+on public.payment_transactions
 for all
 using (public.is_admin())
 with check (public.is_admin());
@@ -716,4 +790,52 @@ for delete
 using (
   bucket_id = 'property-images'
   and auth.uid()::text = (storage.foldername(name))[1]
+);
+
+-- Storage policies (bucket: host-documents)
+-- Create the bucket manually in Supabase Storage as PRIVATE.
+drop policy if exists "Users read own host documents" on storage.objects;
+drop policy if exists "Users upload own host documents" on storage.objects;
+drop policy if exists "Users update own host documents" on storage.objects;
+drop policy if exists "Users delete own host documents" on storage.objects;
+drop policy if exists "Admins read all host documents" on storage.objects;
+
+create policy "Users read own host documents"
+on storage.objects
+for select
+using (
+  bucket_id = 'host-documents'
+  and auth.uid()::text = (storage.foldername(name))[1]
+);
+
+create policy "Users upload own host documents"
+on storage.objects
+for insert
+with check (
+  bucket_id = 'host-documents'
+  and auth.uid()::text = (storage.foldername(name))[1]
+);
+
+create policy "Users update own host documents"
+on storage.objects
+for update
+using (
+  bucket_id = 'host-documents'
+  and auth.uid()::text = (storage.foldername(name))[1]
+);
+
+create policy "Users delete own host documents"
+on storage.objects
+for delete
+using (
+  bucket_id = 'host-documents'
+  and auth.uid()::text = (storage.foldername(name))[1]
+);
+
+create policy "Admins read all host documents"
+on storage.objects
+for select
+using (
+  bucket_id = 'host-documents'
+  and public.is_admin()
 );

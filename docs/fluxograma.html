@@ -1,0 +1,920 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Aluga Aluga | Fluxograma do App</title>
+    <meta name="description" content="Fluxograma completo do Aluga Aluga (web app + admin), rotas, telas, botões e fluxos." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --ocean: #0b5fff;
+        --ocean-weak: rgba(11, 95, 255, 0.12);
+        --sand: #f3e8d3;
+        --pine: #0f766e;
+        --ink: #0b1220;
+        --muted: #5b667a;
+        --bg: #f6f7fb;
+        --card: rgba(255, 255, 255, 0.86);
+        --border: #e5e7eb;
+        --shadow: 0 18px 48px rgba(11, 18, 32, 0.12);
+        --shadow-soft: 0 10px 22px rgba(11, 18, 32, 0.10);
+        --radius: 18px;
+        --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      }
+
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        background:
+          radial-gradient(900px 500px at 20% -10%, rgba(11, 95, 255, 0.18), transparent 60%),
+          radial-gradient(900px 500px at 90% 10%, rgba(15, 118, 110, 0.12), transparent 55%),
+          linear-gradient(180deg, #fbfcff, var(--bg));
+        color: var(--ink);
+        font-family: "Manrope", "Segoe UI", system-ui, sans-serif;
+      }
+
+      .wrap { max-width: 1240px; margin: 0 auto; padding: 22px 16px 56px; }
+
+      .hero {
+        border: 1px solid rgba(229, 231, 235, 0.7);
+        border-radius: calc(var(--radius) + 8px);
+        overflow: hidden;
+        box-shadow: var(--shadow);
+        background:
+          linear-gradient(135deg, rgba(11, 95, 255, 0.96), rgba(41, 109, 250, 0.92)),
+          radial-gradient(900px 400px at 80% 40%, rgba(255, 255, 255, 0.22), transparent 55%);
+      }
+      .hero-inner { padding: 22px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+      .hero-title { display: flex; align-items: center; gap: 14px; }
+      .logo {
+        width: 56px; height: 56px; border-radius: 16px;
+        background: rgba(255, 255, 255, 0.14);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        display: grid; place-items: center;
+        overflow: hidden;
+      }
+      .logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+      .hero h1 { margin: 0; font-size: 20px; line-height: 1.1; color: #fff; letter-spacing: -0.02em; }
+      .hero p { margin: 6px 0 0; font-size: 13px; color: rgba(255, 255, 255, 0.86); }
+
+      .meta { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; color: rgba(255, 255, 255, 0.92); font-size: 12px; }
+      .pill {
+        padding: 7px 10px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.14);
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        display: inline-flex; gap: 8px; align-items: center;
+        white-space: nowrap;
+      }
+      .dot { width: 8px; height: 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.95); }
+      .dot.pine { background: rgba(163, 255, 243, 0.95); }
+      .dot.sand { background: rgba(255, 246, 221, 0.95); }
+
+      .grid { margin-top: 16px; display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 14px; align-items: start; }
+      .card {
+        background: var(--card);
+        border: 1px solid rgba(229, 231, 235, 0.85);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow-soft);
+        overflow: hidden;
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+      }
+      .card-head {
+        padding: 14px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border-bottom: 1px solid rgba(229, 231, 235, 0.85);
+        background: linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,255,255,0.75));
+      }
+      .card-title { display: flex; flex-direction: column; gap: 2px; }
+      .card-title strong { font-size: 13px; letter-spacing: -0.01em; }
+      .card-title span { font-size: 12px; color: var(--muted); }
+      .card-body { padding: 14px 16px; }
+
+      .searchbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+      .searchbar input {
+        flex: 1; min-width: 220px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        border: 1px solid rgba(229, 231, 235, 0.95);
+        outline: none;
+        background: rgba(255, 255, 255, 0.92);
+        color: var(--ink);
+      }
+      .searchbar input:focus { border-color: rgba(11, 95, 255, 0.35); box-shadow: 0 0 0 4px rgba(11, 95, 255, 0.10); }
+      .btn {
+        border: 1px solid rgba(229, 231, 235, 0.92);
+        background: rgba(255, 255, 255, 0.92);
+        border-radius: 999px;
+        padding: 10px 12px;
+        font-size: 12px;
+        color: #1f2a44;
+        cursor: pointer;
+      }
+      .btn:hover { border-color: rgba(11, 95, 255, 0.30); }
+
+      .sections { display: grid; gap: 16px; }
+      .section {
+        border-radius: calc(var(--radius) - 4px);
+        border: 1px solid rgba(229, 231, 235, 0.86);
+        background:
+          linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,255,255,0.7));
+        padding: 14px;
+      }
+      .section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+      .section-head h2 { margin: 0; font-size: 15px; letter-spacing: -0.01em; }
+      .section-head p { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
+      .section-tag {
+        font-size: 11px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(11, 95, 255, 0.25);
+        background: rgba(11, 95, 255, 0.08);
+        color: #1b3b79;
+        white-space: nowrap;
+      }
+
+      .section-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+      .menu-grid { display: grid; grid-template-columns: repeat(5, minmax(180px, 1fr)); gap: 12px; }
+      .menu-col {
+        border: 1px solid rgba(229, 231, 235, 0.85);
+        border-radius: 16px;
+        padding: 12px;
+        background: rgba(255, 255, 255, 0.76);
+        display: grid;
+        gap: 10px;
+      }
+      .menu-title { font-size: 13px; font-weight: 700; letter-spacing: -0.01em; display: flex; align-items: center; gap: 8px; }
+      .menu-title span { width: 8px; height: 8px; border-radius: 999px; background: var(--ocean); }
+      .menu-desc { font-size: 11px; color: var(--muted); }
+      .menu-stack { display: grid; gap: 10px; }
+
+      .node {
+        position: relative;
+        border-radius: 14px;
+        border: 1px solid rgba(229, 231, 235, 0.90);
+        background: rgba(255, 255, 255, 0.9);
+        padding: 10px 12px;
+        box-shadow: 0 10px 20px rgba(11, 18, 32, 0.06);
+        cursor: pointer;
+        user-select: none;
+        transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+      }
+      .node:hover { transform: translateY(-1px); border-color: rgba(11, 95, 255, 0.25); box-shadow: 0 14px 30px rgba(11, 18, 32, 0.10); }
+      .node.active { border-color: rgba(11, 95, 255, 0.55); box-shadow: 0 16px 36px rgba(11, 95, 255, 0.16); }
+      .node-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+      .badge {
+        display: inline-flex; gap: 7px; align-items: center;
+        font-size: 10px; padding: 5px 8px;
+        border-radius: 999px;
+        border: 1px solid rgba(229, 231, 235, 0.95);
+        background: rgba(11, 18, 32, 0.03);
+        color: #22314d;
+        white-space: nowrap;
+      }
+      .badge .mark { width: 8px; height: 8px; border-radius: 999px; }
+      .badge.public .mark { background: var(--ocean); }
+      .badge.auth .mark { background: var(--pine); }
+      .badge.admin .mark { background: #0b1220; }
+      .badge.backend .mark { background: #1b3b79; }
+      .node h3 { margin: 8px 0 2px; font-size: 13px; letter-spacing: -0.01em; }
+      .node code {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: #243b69;
+        background: rgba(11, 95, 255, 0.07);
+        border: 1px solid rgba(11, 95, 255, 0.14);
+        border-radius: 10px;
+        padding: 3px 6px;
+      }
+      .node p { margin: 8px 0 0; font-size: 12px; color: var(--muted); line-height: 1.35; }
+
+      .details { position: sticky; top: 12px; }
+      .kvs { display: grid; grid-template-columns: 108px 1fr; gap: 8px 10px; align-items: start; }
+      .kvs div { font-size: 12px; color: var(--muted); }
+      .kvs strong { font-size: 12px; color: var(--ink); }
+      .sep { height: 1px; background: rgba(229, 231, 235, 0.90); margin: 14px 0; }
+      .actions { display: grid; gap: 10px; }
+      .action {
+        border-radius: 14px;
+        border: 1px solid rgba(229, 231, 235, 0.92);
+        background: rgba(255, 255, 255, 0.90);
+        padding: 10px;
+      }
+      .action strong { font-size: 12px; }
+      .action p { margin: 6px 0 0; font-size: 12px; color: var(--muted); line-height: 1.4; }
+      .action span { color: #0b5fff; font-family: var(--mono); font-size: 11px; }
+
+      .section-hidden { display: none; }
+      .col-hidden { display: none; }
+
+      .footer { margin-top: 14px; color: var(--muted); font-size: 12px; text-align: center; }
+
+      @media (max-width: 1120px) {
+        .grid { grid-template-columns: 1fr; }
+        .details { position: static; }
+        .menu-grid { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+      }
+      @media (max-width: 720px) {
+        .menu-grid { grid-template-columns: 1fr; }
+        .searchbar input { min-width: 100%; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="hero">
+        <div class="hero-inner">
+          <div class="hero-title">
+            <div class="logo" title="Logo do app (public/logoapp.png)">
+              <img
+                src="/logoapp.png"
+                alt="Aluga Aluga"
+                onerror="this.style.display='none'; this.parentElement.textContent='AA'; this.parentElement.style.color='white'; this.parentElement.style.fontWeight='800';"
+              />
+            </div>
+            <div>
+              <h1>Fluxograma do Aluga Aluga</h1>
+              <p>Rotas, telas e botões: tudo separado por categoria do menu (App + Admin Web)</p>
+            </div>
+          </div>
+          <div class="meta">
+            <span class="pill"><span class="dot"></span> Público</span>
+            <span class="pill"><span class="dot pine"></span> Requer login</span>
+            <span class="pill"><span class="dot sand"></span> Admin web</span>
+            <span class="pill" id="updatedAt">Atualizado: --</span>
+          </div>
+        </div>
+      </header>
+
+      <main class="grid">
+        <section class="card">
+          <div class="card-head">
+            <div class="card-title">
+              <strong>Mapa de Navegação</strong>
+              <span>Separado por menu (Home, Mapa, Anunciar, Reservas, Perfil). Clique em um bloco para detalhes.</span>
+            </div>
+            <div class="searchbar">
+              <input id="search" type="text" placeholder="Buscar por rota, tela ou regra (ex: /app/checkout, Reservas)" />
+              <button class="btn" id="reset">Limpar</button>
+            </div>
+          </div>
+
+          <div class="card-body">
+            <div class="sections" id="sections">
+              
+              <div class="section" data-section="auth">
+                <div class="section-head">
+                  <div>
+                    <h2>Entrada e Autenticação</h2>
+                    <p>Fluxo público antes do login.</p>
+                  </div>
+                  <span class="section-tag">Público</span>
+                </div>
+                <div class="section-grid">
+                  <div class="node" data-node-id="start">
+                    <div class="node-top">
+                      <span class="badge public"><span class="mark"></span> Público</span>
+                      <span class="badge">Entrada</span>
+                    </div>
+                    <h3>Início</h3>
+                    <p>App abre e decide se mostra autenticação ou área logada.</p>
+                  </div>
+
+                  <div class="node" data-node-id="auth_entry">
+                    <div class="node-top">
+                      <span class="badge public"><span class="mark"></span> Público</span>
+                      <span class="badge">Tela</span>
+                    </div>
+                    <h3>Auth Entry</h3>
+                    <code>/</code>
+                    <p>Background + botões “Criar conta” e “Já tenho conta”.</p>
+                  </div>
+
+                  <div class="node" data-node-id="login">
+                    <div class="node-top">
+                      <span class="badge public"><span class="mark"></span> Público</span>
+                      <span class="badge">Tela</span>
+                    </div>
+                    <h3>Login</h3>
+                    <code>/login</code>
+                    <p>Entrar com email ou telefone + senha.</p>
+                  </div>
+
+                  <div class="node" data-node-id="signup">
+                    <div class="node-top">
+                      <span class="badge public"><span class="mark"></span> Público</span>
+                      <span class="badge">Tela</span>
+                    </div>
+                    <h3>Criar conta</h3>
+                    <code>/signup</code>
+                    <p>Cadastro com dados pessoais e senha forte.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="section" data-section="app_shell">
+                <div class="section-head">
+                  <div>
+                    <h2>Estrutura do App</h2>
+                    <p>Base com menu inferior e regras gerais de acesso.</p>
+                  </div>
+                  <span class="section-tag">Requer login</span>
+                </div>
+                <div class="section-grid">
+                  <div class="node" data-node-id="app_shell">
+                    <div class="node-top">
+                      <span class="badge auth"><span class="mark"></span> Requer login</span>
+                      <span class="badge">Shell</span>
+                    </div>
+                    <h3>AppShell</h3>
+                    <code>/app/*</code>
+                    <p>Bottom nav: Home, Mapa, Anunciar, Reservas, Perfil.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="section" data-section="menu">
+                <div class="section-head">
+                  <div>
+                    <h2>Menu do App (separado por categoria)</h2>
+                    <p>Cada coluna é uma área do menu inferior.</p>
+                  </div>
+                  <span class="section-tag">Requer login</span>
+                </div>
+                <div class="menu-grid">
+                  <div class="menu-col" data-column="home">
+                    <div>
+                      <div class="menu-title"><span></span> Home</div>
+                      <div class="menu-desc">Descoberta e listagem de imóveis.</div>
+                    </div>
+                    <div class="menu-stack">
+                      <div class="node" data-node-id="home">
+                        <div class="node-top">
+                          <span class="badge auth"><span class="mark"></span> Requer login</span>
+                          <span class="badge">Aba</span>
+                        </div>
+                        <h3>Home</h3>
+                        <code>/app/home</code>
+                        <p>Busca/descoberta e lista de acomodações.</p>
+                      </div>
+                      <div class="node" data-node-id="property_detail">
+                        <div class="node-top">
+                          <span class="badge auth"><span class="mark"></span> Requer login</span>
+                          <span class="badge">Detalhe</span>
+                        </div>
+                        <h3>Detalhe do imóvel</h3>
+                        <code>/app/property/:id</code>
+                        <p>Galeria + comodidades + caixa de reserva.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="menu-col" data-column="map">
+                    <div>
+                      <div class="menu-title"><span></span> Mapa</div>
+                      <div class="menu-desc">Pins, localização e acesso rápido.</div>
+                    </div>
+                    <div class="menu-stack">
+                      <div class="node" data-node-id="map">
+                        <div class="node-top">
+                          <span class="badge auth"><span class="mark"></span> Requer login</span>
+                          <span class="badge">Aba</span>
+                        </div>
+                        <h3>Mapa</h3>
+                        <code>/app/map</code>
+                        <p>Mapa com pins; abrir imóvel e reservar.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="menu-col" data-column="announce">
+                    <div>
+                      <div class="menu-title"><span></span> Anunciar</div>
+                      <div class="menu-desc">Criar e manter anúncios.</div>
+                    </div>
+                    <div class="menu-stack">
+                      <div class="node" data-node-id="announce">
+                        <div class="node-top">
+                          <span class="badge auth"><span class="mark"></span> Requer login</span>
+                          <span class="badge">Aba</span>
+                        </div>
+                        <h3>Anunciar</h3>
+                        <code>/app/announce</code>
+                        <p>Criar anúncio; entra como “pendente” até aprovação admin.</p>
+                      </div>
+                      <div class="node" data-node-id="edit_property">
+                        <div class="node-top">
+                          <span class="badge auth"><span class="mark"></span> Requer login</span>
+                          <span class="badge">Tela</span>
+                        </div>
+                        <h3>Editar anúncio</h3>
+                        <code>/app/edit-property/:id</code>
+                        <p>Editar informações e fotos do imóvel.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="menu-col" data-column="bookings">
+                    <div>
+                      <div class="menu-title"><span></span> Reservas</div>
+                      <div class="menu-desc">Pagamentos, status e chat.</div>
+                    </div>
+                    <div class="menu-stack">
+                      <div class="node" data-node-id="bookings">
+                        <div class="node-top">
+                          <span class="badge auth"><span class="mark"></span> Requer login</span>
+                          <span class="badge">Aba</span>
+                        </div>
+                        <h3>Reservas</h3>
+                        <code>/app/bookings</code>
+                        <p>Status: pagamento pendente → pre-checking → check-in/out.</p>
+                      </div>
+                      <div class="node" data-node-id="checkout">
+                        <div class="node-top">
+                          <span class="badge auth"><span class="mark"></span> Requer login</span>
+                          <span class="badge">Checkout</span>
+                        </div>
+                        <h3>Pagamento</h3>
+                        <code>/app/checkout</code>
+                        <p>Resumo, termos e pagamento (ex: Pix). Ao pagar vira “pre-checking”.</p>
+                      </div>
+                      <div class="node" data-node-id="checkout_id">
+                        <div class="node-top">
+                          <span class="badge auth"><span class="mark"></span> Requer login</span>
+                          <span class="badge">Checkout</span>
+                        </div>
+                        <h3>Pagar reserva</h3>
+                        <code>/app/checkout/:bookingId</code>
+                        <p>Retomar pagamento de uma reserva pendente.</p>
+                      </div>
+                      <div class="node" data-node-id="chat">
+                        <div class="node-top">
+                          <span class="badge auth"><span class="mark"></span> Requer login</span>
+                          <span class="badge">Chat</span>
+                        </div>
+                        <h3>Chat (lista)</h3>
+                        <code>/app/chat</code>
+                        <p>Disponível somente após pagamento (pre-checking+).</p>
+                      </div>
+                      <div class="node" data-node-id="chat_conversation">
+                        <div class="node-top">
+                          <span class="badge auth"><span class="mark"></span> Requer login</span>
+                          <span class="badge">Chat</span>
+                        </div>
+                        <h3>Conversa</h3>
+                        <code>/app/chat/:conversationId</code>
+                        <p>Mensagens em tempo real com bloqueio de contatos externos.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="menu-col" data-column="profile">
+                    <div>
+                      <div class="menu-title"><span></span> Perfil</div>
+                      <div class="menu-desc">Conta do usuário e acesso admin.</div>
+                    </div>
+                    <div class="menu-stack">
+                      <div class="node" data-node-id="profile">
+                        <div class="node-top">
+                          <span class="badge auth"><span class="mark"></span> Requer login</span>
+                          <span class="badge">Aba</span>
+                        </div>
+                        <h3>Perfil</h3>
+                        <code>/app/profile</code>
+                        <p>Conta, dados e (se admin) acesso ao painel.</p>
+                      </div>
+                      <div class="node" data-node-id="admin_web">
+                        <div class="node-top">
+                          <span class="badge admin"><span class="mark"></span> Admin web</span>
+                          <span class="badge">Página</span>
+                        </div>
+                        <h3>Painel Admin</h3>
+                        <code>/admin.html</code>
+                        <p>Moderar anúncios, gerir reservas e visualizar chats.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="section" data-section="admin">
+                <div class="section-head">
+                  <div>
+                    <h2>Admin Web (funções internas)</h2>
+                    <p>Fluxos administrativos fora do app mobile.</p>
+                  </div>
+                  <span class="section-tag">Admin web</span>
+                </div>
+                <div class="section-grid">
+                  <div class="node" data-node-id="admin_moderation">
+                    <div class="node-top">
+                      <span class="badge admin"><span class="mark"></span> Admin web</span>
+                      <span class="badge">Função</span>
+                    </div>
+                    <h3>Aprovar anúncios</h3>
+                    <code>properties.status</code>
+                    <p>pending → approved (aparece na Home/Mapa).</p>
+                  </div>
+
+                  <div class="node" data-node-id="admin_chat">
+                    <div class="node-top">
+                      <span class="badge admin"><span class="mark"></span> Admin web</span>
+                      <span class="badge">Função</span>
+                    </div>
+                    <h3>Monitorar chats</h3>
+                    <code>chat_*</code>
+                    <p>Admin pode visualizar conversas/mensagens (RLS via is_admin).</p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="section" data-section="backend">
+                <div class="section-head">
+                  <div>
+                    <h2>Backend / Supabase</h2>
+                    <p>Dados, storage e realtime que sustentam o app.</p>
+                  </div>
+                  <span class="section-tag">Infra</span>
+                </div>
+                <div class="section-grid">
+                  <div class="node" data-node-id="supabase">
+                    <div class="node-top">
+                      <span class="badge backend"><span class="mark"></span> Backend</span>
+                      <span class="badge">Stack</span>
+                    </div>
+                    <h3>Supabase</h3>
+                    <code>DB + Storage + Realtime</code>
+                    <p>RLS + funções (is_admin, ensure_booking_chat) + triggers de validação.</p>
+                  </div>
+                </div>
+              </div>
+
+              
+            </div>
+          </div>
+        </section>
+
+        <aside class="card details">
+          <div class="card-head">
+            <div class="card-title">
+              <strong id="detailsTitle">Clique em um bloco</strong>
+              <span id="detailsSubtitle">Detalhes da rota, regra e ações.</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="kvs">
+              <div>Rota</div>
+              <strong id="detailsPath">--</strong>
+              <div>Tipo</div>
+              <strong id="detailsType">--</strong>
+              <div>Regra</div>
+              <strong id="detailsRule">--</strong>
+            </div>
+            <div class="sep"></div>
+            <div class="actions" id="detailsActions"></div>
+          </div>
+        </aside>
+      </main>
+
+      <div class="footer">Arquivo estático: docs/fluxograma.html</div>
+    </div>
+
+    <script>
+      (function () {
+        const updatedAt = document.getElementById('updatedAt');
+        const search = document.getElementById('search');
+        const reset = document.getElementById('reset');
+
+        const detailsTitle = document.getElementById('detailsTitle');
+        const detailsSubtitle = document.getElementById('detailsSubtitle');
+        const detailsPath = document.getElementById('detailsPath');
+        const detailsType = document.getElementById('detailsType');
+        const detailsRule = document.getElementById('detailsRule');
+        const detailsActions = document.getElementById('detailsActions');
+
+        const DETAILS = {
+          start: {
+            title: 'Início',
+            subtitle: 'Decisão inicial de navegação',
+            path: '/',
+            type: 'App',
+            rule: 'Se tiver sessão válida: entra em /app/home. Se não: mostra Auth Entry.',
+            actions: [
+              { label: 'Sessão existe', desc: 'Vai para área logada.', to: '/app/home' },
+              { label: 'Sem sessão', desc: 'Mostra tela com botões de entrada.', to: '/' },
+            ],
+          },
+          auth_entry: {
+            title: 'Auth Entry',
+            subtitle: 'Tela inicial de autenticação (com background.png)',
+            path: '/',
+            type: 'Público',
+            rule: 'Sem login; só escolhe fluxo.',
+            actions: [
+              { label: 'Criar conta', desc: 'Leva para cadastro.', to: '/signup' },
+              { label: 'Já tenho conta', desc: 'Leva para login.', to: '/login' },
+            ],
+          },
+          login: {
+            title: 'Login',
+            subtitle: 'Entrar com email ou telefone + senha',
+            path: '/login',
+            type: 'Público',
+            rule: 'Senha com requisitos; ao entrar redireciona para /app/home.',
+            actions: [
+              { label: 'Entrar', desc: 'Autentica no Supabase e entra no app.', to: '/app/home' },
+              { label: 'Criar conta', desc: 'Se não tem conta, ir para cadastro.', to: '/signup' },
+            ],
+          },
+          signup: {
+            title: 'Criar conta',
+            subtitle: 'Cadastro com dados pessoais',
+            path: '/signup',
+            type: 'Público',
+            rule: 'Coleta nome, telefone, cpf, email, nascimento e senha forte.',
+            actions: [
+              { label: 'Cadastrar', desc: 'Cria conta; pode exigir confirmação de email.', to: '/login' },
+              { label: 'Já tenho conta', desc: 'Voltar para login.', to: '/login' },
+            ],
+          },
+          app_shell: {
+            title: 'AppShell',
+            subtitle: 'Estrutura principal com menu inferior',
+            path: '/app/*',
+            type: 'Protegido',
+            rule: 'Requer login. Mantém navegação e layout consistente.',
+            actions: [
+              { label: 'Home', desc: 'Lista / busca.', to: '/app/home' },
+              { label: 'Mapa', desc: 'Pins e imóveis.', to: '/app/map' },
+              { label: 'Anunciar', desc: 'Criar anúncio.', to: '/app/announce' },
+              { label: 'Reservas', desc: 'Minhas reservas.', to: '/app/bookings' },
+              { label: 'Perfil', desc: 'Conta e configurações.', to: '/app/profile' },
+            ],
+          },
+          home: {
+            title: 'Home',
+            subtitle: 'Descoberta e listagem',
+            path: '/app/home',
+            type: 'Protegido',
+            rule: 'Mostra somente imóveis aprovados (status=approved).',
+            actions: [
+              { label: 'Abrir card', desc: 'Ver detalhes do imóvel.', to: '/app/property/:id' },
+            ],
+          },
+          map: {
+            title: 'Mapa',
+            subtitle: 'Mapa com pins (endereços/CEP)',
+            path: '/app/map',
+            type: 'Protegido',
+            rule: 'Pins refletem lat/lng do imóvel (geocoding por endereço).',
+            actions: [
+              { label: 'Clique no pin', desc: 'Mostra preview do imóvel.', to: '/app/property/:id' },
+            ],
+          },
+          announce: {
+            title: 'Anunciar',
+            subtitle: 'Criar anúncio (wizard)',
+            path: '/app/announce',
+            type: 'Protegido',
+            rule: 'Novo anúncio entra com status=pending e não aparece ao público até aprovação.',
+            actions: [
+              { label: 'Publicar', desc: 'Salva no Supabase (pending).', to: '/app/home' },
+              { label: 'Editar depois', desc: 'Editar anúncio e fotos.', to: '/app/edit-property/:id' },
+            ],
+          },
+          bookings: {
+            title: 'Reservas',
+            subtitle: 'Minhas reservas e status',
+            path: '/app/bookings',
+            type: 'Protegido',
+            rule:
+              'Fluxo: pending_payment → pre_checking → checked_in → checked_out. Chat libera em pre_checking+.',
+            actions: [
+              { label: 'Pagar agora', desc: 'Se pendente, abre checkout do booking.', to: '/app/checkout/:bookingId' },
+              { label: 'Chat', desc: 'Se pre_checking+, abre chat interno.', to: '/app/chat?bookingId=:bookingId' },
+              { label: 'Confirmar check-in', desc: 'Owner marca checked_in.', to: 'status=checked_in' },
+              { label: 'Finalizar estadia', desc: 'Owner marca checked_out.', to: 'status=checked_out' },
+            ],
+          },
+          profile: {
+            title: 'Perfil',
+            subtitle: 'Conta e administração',
+            path: '/app/profile',
+            type: 'Protegido',
+            rule: 'Acesso ao Admin Web somente se role=admin (telefone 5553999005952).',
+            actions: [
+              { label: 'Sair', desc: 'Encerra sessão e volta ao início.', to: '/' },
+              { label: 'Abrir painel admin', desc: 'Abre /admin.html em nova aba.', to: '/admin.html' },
+            ],
+          },
+          property_detail: {
+            title: 'Detalhe do imóvel',
+            subtitle: 'Página do anúncio com reserva',
+            path: '/app/property/:id',
+            type: 'Protegido',
+            rule: 'Não exibir WhatsApp. Chat só após pagamento e status pre_checking+.',
+            actions: [
+              { label: 'Reservar', desc: 'Vai para checkout com datas/hóspedes.', to: '/app/checkout' },
+              { label: 'Editar (owner)', desc: 'Se dono do anúncio, pode editar.', to: '/app/edit-property/:id' },
+            ],
+          },
+          edit_property: {
+            title: 'Editar anúncio',
+            subtitle: 'Atualizar dados e fotos',
+            path: '/app/edit-property/:id',
+            type: 'Protegido',
+            rule: 'Somente owner (ou admin) edita. Fotos sobem para bucket property-images.',
+            actions: [
+              { label: 'Salvar', desc: 'Atualiza no Supabase.', to: '/app/property/:id' },
+            ],
+          },
+          checkout: {
+            title: 'Pagamento',
+            subtitle: 'Checkout de uma reserva',
+            path: '/app/checkout',
+            type: 'Protegido',
+            rule: 'Após confirmação de pagamento: status vira pre_checking e habilita chat interno.',
+            actions: [
+              { label: 'Confirmar e pagar', desc: 'Cria/atualiza booking e cobra.', to: '/app/bookings' },
+              { label: 'Abrir chat', desc: 'Disponível depois do pagamento (pre_checking).', to: '/app/chat' },
+            ],
+          },
+          checkout_id: {
+            title: 'Pagar reserva',
+            subtitle: 'Retomar pagamento',
+            path: '/app/checkout/:bookingId',
+            type: 'Protegido',
+            rule: 'Quando booking está em pending_payment.',
+            actions: [
+              { label: 'Pagar', desc: 'Ao pagar, vira pre_checking.', to: '/app/bookings' },
+            ],
+          },
+          chat: {
+            title: 'Chat (lista)',
+            subtitle: 'Conversas internas (plataforma)',
+            path: '/app/chat',
+            type: 'Protegido',
+            rule: 'Somente para bookings com status pre_checking/checked_in/checked_out.',
+            actions: [
+              { label: 'Abrir conversa', desc: 'Entra no chat do booking.', to: '/app/chat/:conversationId' },
+            ],
+          },
+          chat_conversation: {
+            title: 'Conversa',
+            subtitle: 'Mensagens em tempo real',
+            path: '/app/chat/:conversationId',
+            type: 'Protegido',
+            rule:
+              'Bloqueio server-side: não permite email, links, WhatsApp, telefone, Pix e números longos (anti-desvio).',
+            actions: [
+              { label: 'Enviar mensagem', desc: 'Insere em chat_messages e atualiza last_message_at.', to: 'realtime' },
+            ],
+          },
+          admin_web: {
+            title: 'Admin Web',
+            subtitle: 'Painel do Aluga Aluga',
+            path: '/admin.html',
+            type: 'Admin',
+            rule: 'Somente role=admin e telefone 5553999005952 (RLS no banco).',
+            actions: [
+              { label: 'Aprovar anúncio', desc: 'Muda properties.status para approved.', to: 'properties.status=approved' },
+              { label: 'Ver chats', desc: 'Visualiza conversas/mensagens.', to: 'chat_*' },
+            ],
+          },
+          admin_moderation: {
+            title: 'Moderação',
+            subtitle: 'Aprovar/recusar anúncios pendentes',
+            path: 'Admin → Moderação',
+            type: 'Admin',
+            rule: 'Ao aprovar, imóvel aparece no app (Home/Mapa).',
+            actions: [
+              { label: 'pending → approved', desc: 'Libera para o público.', to: '/app/home' },
+              { label: 'pending → rejected', desc: 'Não aparece no app.', to: 'properties.status=rejected' },
+            ],
+          },
+          admin_chat: {
+            title: 'Monitorar chats',
+            subtitle: 'Visão administrativa de conversas',
+            path: 'Admin → Chats',
+            type: 'Admin',
+            rule: 'Admin pode auditar/atender incidentes mantendo privacidade.',
+            actions: [
+              { label: 'Abrir conversa', desc: 'Ver mensagens do booking.', to: '/app/chat/:conversationId' },
+            ],
+          },
+          supabase: {
+            title: 'Supabase',
+            subtitle: 'Banco + Storage + Realtime',
+            path: 'Supabase',
+            type: 'Backend',
+            rule: 'RLS + funções (is_admin, ensure_booking_chat) + triggers de validação de mensagem.',
+            actions: [
+              { label: 'Tabelas', desc: 'users, properties, bookings, chat_conversations, chat_messages.', to: 'DB' },
+              { label: 'Storage', desc: 'Bucket property-images para fotos.', to: 'Storage' },
+              { label: 'Realtime', desc: 'Atualiza chat e dados em tempo real.', to: 'Realtime' },
+            ],
+          },
+        };
+
+        function nowLabel() {
+          const d = new Date();
+          const pad = (n) => String(n).padStart(2, '0');
+          return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(
+            d.getMinutes()
+          )}`;
+        }
+
+        function getNodeEl(nodeId) {
+          return document.querySelector(`.node[data-node-id="${CSS.escape(nodeId)}"]`);
+        }
+
+        function setActive(nodeId) {
+          document.querySelectorAll('.node').forEach((n) => n.classList.remove('active'));
+          const el = getNodeEl(nodeId);
+          if (el) el.classList.add('active');
+          renderDetails(nodeId);
+        }
+
+        function renderDetails(nodeId) {
+          const d = DETAILS[nodeId];
+          if (!d) return;
+          detailsTitle.textContent = d.title || '—';
+          detailsSubtitle.textContent = d.subtitle || '';
+          detailsPath.textContent = d.path || '—';
+          detailsType.textContent = d.type || '—';
+          detailsRule.textContent = d.rule || '—';
+          detailsActions.innerHTML = '';
+          (d.actions || []).forEach((a) => {
+            const div = document.createElement('div');
+            div.className = 'action';
+            div.innerHTML = `<strong>${escapeHtml(a.label || 'Ação')}</strong><p>${escapeHtml(
+              a.desc || ''
+            )}${a.to ? ` <span>${escapeHtml(a.to)}</span>` : ''}</p>`;
+            detailsActions.appendChild(div);
+          });
+        }
+
+        function escapeHtml(s) {
+          return String(s)
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#039;');
+        }
+
+        function applyFilter(q) {
+          const query = (q || '').trim().toLowerCase();
+          document.querySelectorAll('.node').forEach((n) => {
+            const text = (n.textContent || '').toLowerCase();
+            const ok = query === '' ? true : text.includes(query);
+            n.dataset.filtered = ok ? '0' : '1';
+            n.style.opacity = ok ? '1' : '0.18';
+            n.style.filter = ok ? 'none' : 'grayscale(1)';
+          });
+
+          document.querySelectorAll('.menu-col').forEach((col) => {
+            const nodes = col.querySelectorAll('.node');
+            const anyVisible = Array.from(nodes).some((n) => n.dataset.filtered !== '1');
+            col.classList.toggle('col-hidden', !anyVisible);
+          });
+
+          document.querySelectorAll('.section').forEach((section) => {
+            const nodes = section.querySelectorAll('.node');
+            const anyVisible = Array.from(nodes).some((n) => n.dataset.filtered !== '1');
+            section.classList.toggle('section-hidden', !anyVisible);
+          });
+        }
+
+        updatedAt.textContent = `Atualizado: ${nowLabel()}`;
+
+        document.querySelectorAll('.node').forEach((n) => {
+          n.addEventListener('click', () => setActive(n.dataset.nodeId));
+          n.dataset.filtered = '0';
+        });
+
+        search.addEventListener('input', (e) => applyFilter(e.target.value));
+        reset.addEventListener('click', () => {
+          search.value = '';
+          applyFilter('');
+          setActive('auth_entry');
+        });
+
+        setActive('auth_entry');
+      })();
+    </script>
+  </body>
+</html>

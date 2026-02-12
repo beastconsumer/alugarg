@@ -73,6 +73,10 @@ if (-not (Test-Path $cloudflaredPath)) {
 
 Stop-PortProcess -TargetPort $Port
 
+# Ensure we don't have stale tunnels still running (they also can hold old logfiles).
+Get-Process cloudflared -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Start-Sleep -Milliseconds 250
+
 $launcherPath = Join-Path $PSScriptRoot '.run_web_local.cmd'
 $launcherLines = @(
   '@echo off',
@@ -107,29 +111,44 @@ if (-not $ready) {
   exit 1
 }
 
-$tunnelLog = Join-Path $PSScriptRoot '.share_tunnel.log'
-if (Test-Path $tunnelLog) {
-  Remove-Item $tunnelLog -Force
-}
+# Use a unique logfile per run to avoid Windows file locking issues.
+# IMPORTANT: pass logfile as a relative path to avoid quoting/space issues on Windows.
+$tunnelLogName = ('.share_tunnel.{0}.log' -f (Get-Date -Format 'yyyyMMdd_HHmmss'))
+$tunnelLog = Join-Path $PSScriptRoot $tunnelLogName
+New-Item -ItemType File -Path $tunnelLog -Force | Out-Null
 
 Write-Host 'Abrindo tunel publico...' -ForegroundColor Cyan
-$arg = '/c "{0}" tunnel --url http://127.0.0.1:{1} --no-autoupdate > "{2}" 2>&1' -f $cloudflaredPath, $Port, $tunnelLog
-$tunnelProc = Start-Process -FilePath 'cmd.exe' -ArgumentList $arg -PassThru
+# Use cloudflared native logfile. Redirection through cmd is flaky on Windows when running detached.
+$tunnelArgs = @(
+  '--logfile', $tunnelLogName,
+  '--loglevel', 'info',
+  'tunnel',
+  '--url', ("http://127.0.0.1:{0}" -f $Port),
+  '--no-autoupdate'
+)
+$tunnelProc = Start-Process -FilePath $cloudflaredPath -WorkingDirectory $PSScriptRoot -ArgumentList $tunnelArgs -PassThru
 
 $publicUrl = $null
-for ($i = 0; $i -lt 60; $i++) {
+for ($i = 0; $i -lt 120; $i++) {
   Start-Sleep -Milliseconds 500
-  if (Test-Path $tunnelLog) {
-    $content = Get-Content $tunnelLog -Raw -ErrorAction SilentlyContinue
-    if ($content -match 'https://[-a-zA-Z0-9]+\.trycloudflare\.com') {
-      $publicUrl = $matches[0]
-      break
-    }
+
+  $content = Get-Content $tunnelLog -Raw -ErrorAction SilentlyContinue
+  if ($content -match 'https://[-a-zA-Z0-9]+\.trycloudflare\.com') {
+    $publicUrl = $matches[0]
+    break
+  }
+
+  # If cloudflared died, bail early with the logfile path.
+  if ($i -ge 10) {
+    try {
+      $p = Get-Process -Id $tunnelProc.Id -ErrorAction Stop
+      if ($p.HasExited) { break }
+    } catch { break }
   }
 }
 
 if (-not $publicUrl) {
-  Write-Host 'Nao consegui capturar URL publica. Veja .share_tunnel.log' -ForegroundColor Red
+  Write-Host ("Nao consegui capturar URL publica. Veja {0}" -f $tunnelLog) -ForegroundColor Red
   exit 1
 }
 
@@ -138,7 +157,8 @@ $pidFile = Join-Path $PSScriptRoot '.share_pids.txt'
   ('APP_PID={0}' -f $appProc.Id),
   ('TUNNEL_PID={0}' -f $tunnelProc.Id),
   ('PORT={0}' -f $Port),
-  ('URL={0}' -f $publicUrl)
+  ('URL={0}' -f $publicUrl),
+  ('TUNNEL_LOG={0}' -f $tunnelLog)
 ) | Set-Content -Path $pidFile -Encoding ascii
 
 Write-Host "App local: http://127.0.0.1:$Port" -ForegroundColor Green

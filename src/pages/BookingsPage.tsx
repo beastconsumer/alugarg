@@ -13,10 +13,11 @@ import {
   Title,
 } from '@mantine/core';
 import { CalendarCheck2, CircleDollarSign, Clock3, House } from 'lucide-react';
+import { findSeedPropertyById } from '../lib/seedProperties';
 import { useAuth } from '../state/AuthContext';
 import { formatDate, formatMoney } from '../lib/format';
 import { supabase } from '../lib/supabase';
-import { Booking, parseBooking } from '../lib/types';
+import { Booking, parseBooking, parseProperty } from '../lib/types';
 
 const bookingStatusMeta: Record<
   Booking['status'],
@@ -35,6 +36,7 @@ export function BookingsPage() {
 
   const [renterBookings, setRenterBookings] = useState<Booking[]>([]);
   const [ownerBookings, setOwnerBookings] = useState<Booking[]>([]);
+  const [bookingCoversByPropertyId, setBookingCoversByPropertyId] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -58,6 +60,37 @@ export function BookingsPage() {
 
       setRenterBookings(parsedRenter);
       setOwnerBookings(parsedOwner);
+
+      const allBookings = [...parsedRenter, ...parsedOwner];
+      const uniquePropertyIds = Array.from(new Set(allBookings.map((item) => item.property_id).filter(Boolean)));
+
+      const nextCovers: Record<string, string> = {};
+      const idsToFetchFromDb: string[] = [];
+
+      uniquePropertyIds.forEach((propertyId) => {
+        const seedProperty = findSeedPropertyById(propertyId);
+        if (seedProperty?.photos?.[0]) {
+          nextCovers[propertyId] = seedProperty.photos[0];
+          return;
+        }
+        idsToFetchFromDb.push(propertyId);
+      });
+
+      if (idsToFetchFromDb.length > 0) {
+        const { data: propertiesRaw, error: propertiesError } = await supabase
+          .from('properties')
+          .select('*')
+          .in('id', idsToFetchFromDb);
+
+        if (propertiesError) throw propertiesError;
+
+        (propertiesRaw ?? []).forEach((row) => {
+          const property = parseProperty(row);
+          nextCovers[property.id] = property.photos[0] || '/background.png';
+        });
+      }
+
+      setBookingCoversByPropertyId(nextCovers);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Falha ao carregar reservas');
     } finally {
@@ -179,42 +212,52 @@ export function BookingsPage() {
 
                   return (
                     <Card key={booking.id} withBorder radius="lg" p="md" className="booking-card">
-                      <Stack gap="sm">
-                        <Stack gap={5}>
-                          <Text fw={700}>{booking.property_title}</Text>
-                          <Text size="sm" c="dimmed">
-                            {formatDate(booking.check_in_date)} ate {formatDate(booking.check_out_date)}
-                          </Text>
-                          <Text size="sm">Total pago: {formatMoney(booking.total_paid_by_renter)}</Text>
-                          <Badge variant="light" color={meta.color}>
-                            {meta.label}
-                          </Badge>
+                      <Group wrap="nowrap" className="booking-card-row">
+                        <div className="booking-card-cover-wrap">
+                          <img
+                            src={bookingCoversByPropertyId[booking.property_id] || '/background.png'}
+                            alt={booking.property_title}
+                            className="booking-card-cover"
+                          />
+                        </div>
+
+                        <Stack gap="sm" className="booking-card-main">
+                          <Stack gap={5}>
+                            <Text fw={700}>{booking.property_title}</Text>
+                            <Text size="sm" c="dimmed">
+                              {formatDate(booking.check_in_date)} ate {formatDate(booking.check_out_date)}
+                            </Text>
+                            <Text size="sm">Total pago: {formatMoney(booking.total_paid_by_renter)}</Text>
+                            <Badge variant="light" color={meta.color}>
+                              {meta.label}
+                            </Badge>
+                          </Stack>
+
+                          <Group wrap="wrap" gap="xs">
+                            {normalizedStatus === 'pending_payment' ? (
+                              <Button component={Link} to={`/app/checkout/${booking.id}`} size="xs">
+                                Pagar agora
+                              </Button>
+                            ) : null}
+                            {normalizedStatus === 'pre_checking' ? (
+                              <Button size="xs" variant="light" color="teal" disabled>
+                                Check-in pendente
+                              </Button>
+                            ) : null}
+                            {['pre_checking', 'checked_in', 'checked_out'].includes(normalizedStatus) ? (
+                              <Button component={Link} to={`/app/chat?bookingId=${booking.id}`} size="xs" variant="default">
+                                Chat com dono
+                              </Button>
+                            ) : null}
+
+                            {normalizedStatus === 'checked_out' ? (
+                              <Button component={Link} to="/app/profile" size="xs" variant="default">
+                                Avaliar anfitriao
+                              </Button>
+                            ) : null}
+                          </Group>
                         </Stack>
-
-                        <Group wrap="wrap" gap="xs">
-                          {normalizedStatus === 'pending_payment' ? (
-                            <Button component={Link} to={`/app/checkout/${booking.id}`} size="xs">
-                              Pagar agora
-                            </Button>
-                          ) : null}
-                          {normalizedStatus === 'pre_checking' ? (
-                            <Button size="xs" variant="light" color="teal" disabled>
-                              Check-in pendente
-                            </Button>
-                          ) : null}
-                          {['pre_checking', 'checked_in', 'checked_out'].includes(normalizedStatus) ? (
-                            <Button component={Link} to={`/app/chat?bookingId=${booking.id}`} size="xs" variant="default">
-                              Chat com dono
-                            </Button>
-                          ) : null}
-
-                          {normalizedStatus === 'checked_out' ? (
-                            <Button component={Link} to="/app/profile" size="xs" variant="default">
-                              Avaliar anfitriao
-                            </Button>
-                          ) : null}
-                        </Group>
-                      </Stack>
+                      </Group>
                     </Card>
                   );
                 })}
@@ -274,35 +317,45 @@ export function BookingsPage() {
                   const meta = bookingStatusMeta[normalizedStatus];
                   return (
                     <Card key={booking.id} withBorder radius="lg" p="md" className="booking-card">
-                      <Group justify="space-between" align="flex-start" gap="md">
-                        <Stack gap={5}>
-                          <Text fw={700}>{booking.property_title}</Text>
-                          <Text size="sm" c="dimmed">
-                            {formatDate(booking.check_in_date)} ate {formatDate(booking.check_out_date)}
-                          </Text>
-                          <Text size="sm">Repasse previsto: {formatMoney(booking.owner_payout_amount)}</Text>
-                          <Badge variant="light" color={meta.color}>
-                            {meta.label}
-                          </Badge>
-                        </Stack>
+                      <Group wrap="nowrap" className="booking-card-row">
+                        <div className="booking-card-cover-wrap">
+                          <img
+                            src={bookingCoversByPropertyId[booking.property_id] || '/background.png'}
+                            alt={booking.property_title}
+                            className="booking-card-cover"
+                          />
+                        </div>
 
-                        <Group>
-                          {['pre_checking', 'checked_in', 'checked_out'].includes(normalizedStatus) ? (
-                            <Button component={Link} to={`/app/chat?bookingId=${booking.id}`} size="xs" variant="default">
-                              Abrir chat
-                            </Button>
-                          ) : null}
-                          {normalizedStatus === 'pre_checking' ? (
-                            <Button size="xs" variant="default" onClick={() => void updateStatus(booking.id, 'checked_in')}>
-                              Confirmar check-in
-                            </Button>
-                          ) : null}
-                          {normalizedStatus === 'checked_in' ? (
-                            <Button size="xs" onClick={() => void updateStatus(booking.id, 'checked_out')}>
-                              Finalizar estadia
-                            </Button>
-                          ) : null}
-                        </Group>
+                        <Stack gap="sm" className="booking-card-main">
+                          <Stack gap={5}>
+                            <Text fw={700}>{booking.property_title}</Text>
+                            <Text size="sm" c="dimmed">
+                              {formatDate(booking.check_in_date)} ate {formatDate(booking.check_out_date)}
+                            </Text>
+                            <Text size="sm">Repasse previsto: {formatMoney(booking.owner_payout_amount)}</Text>
+                            <Badge variant="light" color={meta.color}>
+                              {meta.label}
+                            </Badge>
+                          </Stack>
+
+                          <Group wrap="wrap" gap="xs">
+                            {['pre_checking', 'checked_in', 'checked_out'].includes(normalizedStatus) ? (
+                              <Button component={Link} to={`/app/chat?bookingId=${booking.id}`} size="xs" variant="default">
+                                Abrir chat
+                              </Button>
+                            ) : null}
+                            {normalizedStatus === 'pre_checking' ? (
+                              <Button size="xs" variant="default" onClick={() => void updateStatus(booking.id, 'checked_in')}>
+                                Confirmar check-in
+                              </Button>
+                            ) : null}
+                            {normalizedStatus === 'checked_in' ? (
+                              <Button size="xs" onClick={() => void updateStatus(booking.id, 'checked_out')}>
+                                Finalizar estadia
+                              </Button>
+                            ) : null}
+                          </Group>
+                        </Stack>
                       </Group>
                     </Card>
                   );

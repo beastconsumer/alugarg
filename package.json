@@ -4,12 +4,16 @@
   "version": "2.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node scripts/dev-local.mjs",
+    "dev:web": "vite",
+    "api:dev": "node local-api/server.mjs",
     "dev:admin": "vite --open /admin.html",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host"
   },
   "dependencies": {
+    "@capacitor/android": "^8.1.0",
+    "@capacitor/core": "^8.1.0",
     "@emotion/react": "^11.14.0",
     "@mantine/core": "^8.3.14",
     "@mantine/dates": "^8.3.14",
@@ -27,6 +31,7 @@
     "react-router-dom": "^6.30.1"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.1.0",
     "@types/leaflet": "^1.9.21",
     "@types/react": "^18.3.24",
     "@types/react-dom": "^18.3.7",

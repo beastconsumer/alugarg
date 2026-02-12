@@ -36,6 +36,11 @@ const emptyProfileFromUser = (user: User): UserProfile => ({
       ? String(user.user_metadata?.birth_date)
       : null,
   role: 'user',
+  host_verification_status: 'not_started',
+  host_document_type: '',
+  host_document_front_path: '',
+  host_document_back_path: '',
+  host_verification_submitted_at: null,
   created_at: new Date().toISOString(),
 });
 
@@ -76,6 +81,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
       email: seed.email,
       birth_date: seed.birth_date,
       role: seed.role,
+      host_verification_status: seed.host_verification_status,
+      host_document_type: seed.host_document_type,
+      host_document_front_path: seed.host_document_front_path,
+      host_document_back_path: seed.host_document_back_path,
+      host_verification_submitted_at: seed.host_verification_submitted_at,
     });
 
     if (upsertError) {
