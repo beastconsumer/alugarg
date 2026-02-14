@@ -6,6 +6,7 @@ import { LoadingScreen } from './components/LoadingScreen';
 import { useAuth } from './state/AuthContext';
 import { AnnouncePage } from './pages/AnnouncePage';
 import { AuthEntryPage } from './pages/AuthEntryPage';
+import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { BookingCheckoutPage } from './pages/BookingCheckoutPage';
 import { BookingsPage } from './pages/BookingsPage';
 import { ChatPage } from './pages/ChatPage';
@@ -39,6 +40,7 @@ export function AppRouter() {
   return (
     <Routes>
       <Route path="/" element={<AuthEntryPage />} />
+      <Route path="/auth/callback" element={<AuthCallbackPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignUpPage />} />
 

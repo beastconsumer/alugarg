@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">AlugarG</string>
+    <string name="title_activity_main">AlugarG</string>
+    <string name="package_name">com.beastconsumer.alugarg</string>
+    <string name="custom_url_scheme">com.beastconsumer.alugarg</string>
+</resources>

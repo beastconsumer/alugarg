@@ -50,6 +50,8 @@ const hostVerificationLabel: Record<string, string> = {
 
 export function ProfilePage() {
   const { user, profile, refreshProfile, signOut } = useAuth();
+  const displayName = (profile?.name || 'Perfil').trim();
+  const displayNameShort = displayName.split(' ').slice(0, 2).join(' ');
 
   const [name, setName] = useState(profile?.name ?? '');
   const [phone, setPhone] = useState(profile?.phone ?? '');
@@ -241,14 +243,14 @@ export function ProfilePage() {
       <Card withBorder radius="xl" p="lg" className="profile-mobile-id-card">
         <Stack gap="md">
           <Group justify="space-between" align="flex-start" wrap="wrap">
-            <Group gap="md" wrap="nowrap">
+            <Group gap="md" wrap="wrap" align="flex-start">
               <div className="profile-mobile-avatar-wrap">
                 <Avatar src={profile?.avatar_url || '/logoapp.png'} size={92} radius="50%" />
                 <span className="profile-mobile-verify-dot" aria-hidden />
               </div>
               <Stack gap={3}>
-                <Title order={2} className="profile-mobile-name">
-                  {profile?.name || 'Perfil'}
+                <Title order={3} className="profile-mobile-name">
+                  {displayNameShort || 'Perfil'}
                 </Title>
                 <Text size="sm" c="dimmed">
                   {profile?.email || '-'}

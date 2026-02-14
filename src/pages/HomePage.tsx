@@ -12,6 +12,7 @@ import {
   UnstyledButton,
 } from '@mantine/core';
 import { DatePicker, type DatesRangeValue } from '@mantine/dates';
+import { useMediaQuery } from '@mantine/hooks';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { BellRing, Building2, Minus, PartyPopper, Plus, Search } from 'lucide-react';
@@ -63,6 +64,8 @@ const formatDateRange = (value: DatesRangeValue): string => {
 };
 
 export function HomePage() {
+  const isMobile = useMediaQuery('(max-width: 680px)');
+
   const [allProperties, setAllProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
@@ -204,9 +207,9 @@ export function HomePage() {
 
   return (
     <Stack gap="lg" py="md" pb={96}>
-      <Card radius="xl" withBorder p="lg" className="home-air-shell">
+      <Card radius="xl" withBorder p={isMobile ? 'md' : 'lg'} className="home-air-shell">
         <Stack gap="lg">
-          <Group justify="space-between" align="center" gap="sm" className="home-air-tabs-row">
+          <Group justify="space-between" align="center" gap="sm" wrap="nowrap" className="home-air-tabs-row">
             <Group className="home-air-tabs" justify="center" gap="xl" wrap="nowrap">
               <button
                 type="button"
@@ -248,7 +251,14 @@ export function HomePage() {
               </button>
             </Group>
 
-            <Button component={Link} to="/app/announce" variant="default" radius="xl" className="home-air-host-btn">
+            <Button
+              component={Link}
+              to="/app/announce"
+              variant="default"
+              size={isMobile ? 'sm' : 'md'}
+              radius="xl"
+              className="home-air-host-btn"
+            >
               Torne-se um anfitriao
             </Button>
           </Group>
@@ -258,10 +268,11 @@ export function HomePage() {
               <Popover
                 opened={whereOpen}
                 onChange={setWhereOpen}
-                width={360}
-                position="bottom-start"
+                width={isMobile ? 'calc(100vw - 44px)' : 360}
+                position={isMobile ? 'bottom' : 'bottom-start'}
                 shadow="md"
                 offset={10}
+                withinPortal
               >
                 <Popover.Target>
                   <UnstyledButton className="home-search-trigger" onClick={() => openPanel('where')}>
@@ -307,10 +318,11 @@ export function HomePage() {
               <Popover
                 opened={whenOpen}
                 onChange={setWhenOpen}
-                width={760}
+                width={isMobile ? 'calc(100vw - 44px)' : 760}
                 position="bottom"
                 shadow="md"
                 offset={10}
+                withinPortal
               >
                 <Popover.Target>
                   <UnstyledButton className="home-search-trigger" onClick={() => openPanel('when')}>
@@ -337,7 +349,7 @@ export function HomePage() {
 
                     <DatePicker
                       type="range"
-                      numberOfColumns={2}
+                      numberOfColumns={isMobile ? 1 : 2}
                       locale="pt-BR"
                       value={dateRange}
                       onChange={setDateRange}
@@ -352,10 +364,11 @@ export function HomePage() {
               <Popover
                 opened={whoOpen}
                 onChange={setWhoOpen}
-                width={360}
-                position="bottom-end"
+                width={isMobile ? 'calc(100vw - 44px)' : 360}
+                position={isMobile ? 'bottom' : 'bottom-end'}
                 shadow="md"
                 offset={10}
+                withinPortal
               >
                 <Popover.Target>
                   <UnstyledButton className="home-search-trigger" onClick={() => openPanel('who')}>

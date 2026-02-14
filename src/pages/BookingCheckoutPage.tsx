@@ -78,21 +78,12 @@ const parsePixCharge = (raw: unknown): PixCharge => {
   };
 };
 
-const callLocalApi = async <T,>(path: string, body: Record<string, unknown>): Promise<T> => {
-  const response = await fetch(path, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
-
-  const payload = (await response.json()) as Record<string, unknown>;
-  if (!response.ok) {
-    throw new Error(String(payload.error ?? `Falha em ${path}`));
+const callSupabaseFunction = async <T,>(fn: string, body: Record<string, unknown>): Promise<T> => {
+  const { data, error } = await supabase.functions.invoke(fn, { body });
+  if (error) {
+    throw new Error(error.message || `Falha ao chamar funcao ${fn}.`);
   }
-
-  return payload as T;
+  return (data ?? {}) as T;
 };
 
 export function BookingCheckoutPage() {
@@ -160,7 +151,7 @@ export function BookingCheckoutPage() {
     try {
       const guestName = profile?.name || user?.email || 'Hospede';
 
-      await callLocalApi('/api/notifications/booking-confirmation', {
+      await callSupabaseFunction('send-booking-confirmation', {
         toEmail: billingEmail.trim(),
         bookingId: finalBookingId,
         guestName,
@@ -379,7 +370,8 @@ export function BookingCheckoutPage() {
   };
 
   const createPixCharge = async (targetBookingId: string): Promise<PixCharge> => {
-    const data = await callLocalApi<Record<string, unknown>>('/api/payments/pix/create', {
+    const data = await callSupabaseFunction<Record<string, unknown>>('mercadopago-pix', {
+      action: 'create',
       bookingId: targetBookingId,
       amount: amounts.totalPaid,
       payerEmail: billingEmail.trim(),
@@ -406,7 +398,8 @@ export function BookingCheckoutPage() {
     }
 
     try {
-      const data = await callLocalApi<Record<string, unknown>>('/api/payments/pix/check', {
+      const data = await callSupabaseFunction<Record<string, unknown>>('mercadopago-pix', {
+        action: 'check',
         bookingId: targetBookingId,
         paymentId: pixCharge?.paymentId ?? '',
       });

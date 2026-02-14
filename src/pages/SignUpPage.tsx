@@ -51,11 +51,14 @@ export function SignUpPage() {
 
     try {
       const normalizedPhone = toE164Like(phone);
+      const configuredPublicUrl = (import.meta.env.VITE_PUBLIC_APP_URL as string | undefined)?.trim() ?? '';
+      const redirectBase = (configuredPublicUrl || window.location.origin).replace(/\/$/, '');
 
       const { data, error } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
         password,
         options: {
+          emailRedirectTo: `${redirectBase}/auth/callback`,
           data: {
             name: name.trim(),
             phone: normalizedPhone,

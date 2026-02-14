@@ -31,6 +31,18 @@ body {
     radial-gradient(circle at 104% 10%, rgba(200, 162, 74, 0.08), transparent 34%),
     linear-gradient(180deg, #f7f5f2 0%, #eef2f7 100%);
   color: var(--brand-text);
+  overflow-x: hidden;
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+}
+
+.app-content {
+  scroll-padding-bottom: calc(120px + env(safe-area-inset-bottom));
 }
 
 .auth-hero { 
@@ -636,7 +648,7 @@ body {
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  padding-bottom: 96px;
+  padding-bottom: calc(108px + env(safe-area-inset-bottom));
 }
 
 .app-content {
@@ -647,12 +659,13 @@ body {
 .bottom-nav {
   position: fixed;
   left: 50%;
-  bottom: 16px;
+  bottom: calc(10px + env(safe-area-inset-bottom));
   transform: translateX(-50%);
   width: min(96vw, 680px);
   background: rgba(255, 255, 255, 0.97);
   border: 1px solid #d5e1f5;
   padding: 8px;
+  padding-bottom: calc(8px + env(safe-area-inset-bottom));
   z-index: 40;
   backdrop-filter: blur(16px);
   box-shadow: 0 16px 38px rgba(12, 23, 47, 0.16);
@@ -762,6 +775,7 @@ body {
   border: 1px solid #d3deef !important;
   background: #ffffff !important;
   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+  max-width: 210px;
 }
 
 .home-air-tab {
@@ -880,6 +894,9 @@ body {
   border-radius: 18px;
   border: 1px solid #e6ebf4;
   background: #ffffff;
+  max-width: min(760px, calc(100vw - 44px));
+  max-height: min(70vh, 560px);
+  overflow: auto;
 }
 
 .home-air-panel-calendar :where(.mantine-DatePicker-monthsList) {
@@ -1533,8 +1550,12 @@ body {
 
 .profile-mobile-name {
   margin-top: 10px;
-  line-height: 1;
+  line-height: 1.07;
   letter-spacing: -0.4px;
+  font-size: clamp(1.35rem, 4.8vw, 1.75rem);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 240px;
 }
 
 .profile-mobile-superhost {
@@ -1668,6 +1689,40 @@ body {
 }
 
 @media (max-width: 680px) { 
+  .app-layout {
+    padding-bottom: calc(124px + env(safe-area-inset-bottom));
+  }
+
+  .app-content {
+    padding-inline: 12px !important;
+  }
+
+  .home-carousel-section :where(.mantine-Title-root) {
+    font-size: 1.25rem;
+    letter-spacing: -0.2px;
+  }
+
+  .detail-headline {
+    font-size: 1.6rem;
+    letter-spacing: -0.35px;
+  }
+
+  .home-air-host-btn {
+    max-width: 170px;
+  }
+
+  .home-search-trigger-value {
+    font-size: 0.98rem;
+  }
+
+  .home-air-panel {
+    max-height: min(68vh, 520px);
+  }
+
+  .home-air-panel-calendar :where(.mantine-DatePicker-month) {
+    width: 100%;
+  }
+
   .profile-air-layout {
     grid-template-columns: 1fr;
   }
@@ -1732,60 +1787,127 @@ body {
   }
 
   .bottom-nav {
-    width: min(97vw, 520px);
-    bottom: 12px;
+    width: calc(100vw - 14px);
+    max-width: 560px;
+    bottom: calc(8px + env(safe-area-inset-bottom));
+    border-radius: 24px !important;
+    padding: 6px;
   }
 
   .bottom-nav-track {
-    gap: 4px;
+    gap: 3px;
   }
 
   .bottom-nav-item {
-    min-height: 58px;
+    min-height: 56px;
     border-radius: 12px;
+    padding: 6px 2px;
   }
 
   .bottom-nav-label {
-    font-size: 10px;
+    font-size: 9px;
   }
 
   .leaflet-map {
     height: min(56vh, 440px);
   }
 
+  .home-air-shell {
+    border-radius: 24px;
+    padding: 14px !important;
+  }
+
   .home-air-tabs {
     justify-content: flex-start;
-    gap: 18px;
+    gap: 10px;
+    width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .home-air-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .home-air-tab {
+    font-size: 0.95rem;
+    padding-bottom: 8px;
+  }
+
+  .home-air-tab-icon {
+    width: 26px;
+    height: 26px;
   }
 
   .home-air-tabs-row {
-    align-items: flex-start;
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
   }
 
   .home-air-host-btn {
     width: 100%;
+    min-height: 42px;
   }
 
   .home-air-search {
     grid-template-columns: 1fr;
     border-radius: 22px;
-    padding: 14px;
-    gap: 10px;
+    padding: 12px;
+    gap: 8px;
     width: 100%;
+    min-height: 0;
+    box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
   }
 
   .home-air-divider {
     display: none;
   }
 
+  .home-search-trigger {
+    min-height: 36px;
+    border-radius: 12px;
+    padding: 6px 8px;
+  }
+
+  .home-search-trigger-value {
+    font-size: 0.98rem;
+  }
+
   .home-air-search-btn,
   .home-air-search-submit {
     width: 100%;
     border-radius: 12px;
+    min-height: 42px;
   }
 
   .home-listing-item {
     flex-basis: 82vw;
+  }
+
+  .profile-mobile-id-card {
+    padding: 14px !important;
+  }
+
+  .profile-mobile-id-card .mantine-Avatar-root {
+    width: 84px !important;
+    height: 84px !important;
+  }
+
+  .profile-mobile-id-card .mantine-Button-root {
+    min-height: 40px;
+  }
+
+  .profile-section-card {
+    padding: 14px !important;
+  }
+
+  .bookings-kpi-card {
+    padding: 14px !important;
+  }
+
+  .booking-card {
+    padding: 12px !important;
   }
 
   .detail-gallery-grid {
