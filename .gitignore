@@ -9,6 +9,8 @@ node_modules/
 dist/
 .vite/
 *.tsbuildinfo
+android/.gradle-user-home/
+release-assets/
 
 # Environment / secrets
 .env

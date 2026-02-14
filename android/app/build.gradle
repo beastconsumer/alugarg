@@ -5,6 +5,8 @@ android {
     compileSdk = rootProject.ext.compileSdkVersion
 
     def env = System.getenv()
+    def versionCodeEnv = env['ANDROID_VERSION_CODE'] ?: '1'
+    def versionNameEnv = env['ANDROID_VERSION_NAME'] ?: '1.0'
     def releaseKeystorePath = env['ANDROID_KEYSTORE_PATH'] ?: 'release.keystore'
     def hasReleaseSigning =
             env['ANDROID_KEYSTORE_PASSWORD'] &&
@@ -29,8 +31,8 @@ android {
         applicationId "com.beastconsumer.alugarg"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode versionCodeEnv.toInteger()
+        versionName versionNameEnv
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

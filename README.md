@@ -124,3 +124,9 @@ npm run dev
   - `ANDROID_KEYSTORE_PASSWORD`
   - `ANDROID_KEY_ALIAS`
   - `ANDROID_KEY_PASSWORD`
+
+### Nightly (APK automatico a cada push)
+- O workflow `.github/workflows/android-nightly.yml` gera/atualiza um release `nightly` a cada push na branch `main`.
+- Link fixo do APK nightly:
+  - `https://github.com/beastconsumer/alugarg/releases/download/nightly/aluga-aluga-nightly.apk`
+- Para conseguir atualizar por cima (sem desinstalar), o APK precisa ser assinado sempre com a mesma keystore (configure os secrets acima).

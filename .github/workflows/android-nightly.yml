@@ -1,15 +1,20 @@
-name: Android Release (APK)
+name: Android Nightly (APK)
 
 on:
   push:
-    tags:
-      - "v*"
+    branches:
+      - main
+  workflow_dispatch: {}
 
 permissions:
   contents: write
 
+concurrency:
+  group: android-nightly
+  cancel-in-progress: true
+
 jobs:
-  build-and-release:
+  build-and-publish:
     runs-on: ubuntu-latest
 
     steps:
@@ -38,7 +43,7 @@ jobs:
         shell: bash
         run: |
           echo "ANDROID_VERSION_CODE=$(git rev-list --count HEAD)" >> "$GITHUB_ENV"
-          echo "ANDROID_VERSION_NAME=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          echo "ANDROID_VERSION_NAME=nightly-${GITHUB_SHA::7}" >> "$GITHUB_ENV"
 
       - name: Build Web App
         run: npm run build
@@ -63,13 +68,18 @@ jobs:
           ./gradlew assembleRelease
 
       - name: Prepare Release Asset
+        shell: bash
         run: |
           mkdir -p release-assets
-          cp android/app/build/outputs/apk/release/app-release.apk "release-assets/aluga-aluga-${GITHUB_REF_NAME}.apk"
+          cp android/app/build/outputs/apk/release/app-release.apk release-assets/aluga-aluga-nightly.apk
 
-      - name: Create GitHub Release + Upload APK
-        uses: softprops/action-gh-release@v2
+      - name: Publish Nightly Release
+        uses: ncipollo/release-action@v1
         with:
-          generate_release_notes: true
-          files: |
-            release-assets/*.apk
+          tag: nightly
+          name: "Nightly"
+          prerelease: true
+          allowUpdates: true
+          replacesArtifacts: true
+          artifacts: "release-assets/aluga-aluga-nightly.apk"
+
