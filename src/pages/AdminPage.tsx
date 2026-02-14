@@ -33,8 +33,6 @@ import {
   UserProfile,
 } from '../lib/types';
 
-const ADMIN_PHONE_LOCK = '5553999005952';
-
 interface AdminPropertyItem {
   property: Property;
   owner: UserProfile | null;
@@ -268,14 +266,6 @@ export function AdminPage() {
       return;
     }
 
-    const normalizedPhone = normalizePhone(profile.phone);
-    if (normalizedPhone !== ADMIN_PHONE_LOCK) {
-      setIsAdmin(false);
-      setAccessReason('Acesso restrito ao numero +5553999005952.');
-      setReady(true);
-      return;
-    }
-
     setAccessReason('');
     setIsAdmin(true);
     setReady(true);
@@ -411,16 +401,12 @@ export function AdminPage() {
       let email = identifier.trim().toLowerCase();
       if (!email.includes('@')) {
         const normalized = normalizePhone(identifier);
-        if (normalized !== ADMIN_PHONE_LOCK) {
-          throw new Error('Acesso permitido somente ao numero +5553999005952.');
-        }
-
         const { data, error } = await supabase.rpc('get_login_email_by_phone', {
           p_phone: normalized,
         });
 
         if (error) throw error;
-        if (!data) throw new Error('Telefone admin nao encontrado.');
+        if (!data) throw new Error('Telefone nao encontrado.');
 
         email = String(data);
       }
@@ -572,13 +558,13 @@ export function AdminPage() {
             </Stack>
 
             <Alert color="blue" variant="light">
-              Acesso exclusivo para o numero admin: +5553999005952
+              Acesso exclusivo para usuarios com role <strong>admin</strong>.
             </Alert>
 
             <form onSubmit={onLogin}>
               <Stack gap="md">
                 <TextInput
-                  label="Email ou telefone admin"
+                  label="Email ou telefone"
                   value={identifier}
                   onChange={(event) => setIdentifier(event.currentTarget.value)}
                   placeholder="+5553999005952"
