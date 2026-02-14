@@ -3,6 +3,28 @@ apply plugin: 'com.android.application'
 android {
     namespace = "com.beastconsumer.alugarg"
     compileSdk = rootProject.ext.compileSdkVersion
+
+    def env = System.getenv()
+    def releaseKeystorePath = env['ANDROID_KEYSTORE_PATH'] ?: 'release.keystore'
+    def hasReleaseSigning =
+            env['ANDROID_KEYSTORE_PASSWORD'] &&
+            env['ANDROID_KEY_ALIAS'] &&
+            env['ANDROID_KEY_PASSWORD'] &&
+            file(releaseKeystorePath).exists()
+
+    // Signing:
+    // - If release keystore env vars are present, produce a properly signed release APK.
+    // - Otherwise, fall back to debug signing so the CI-built APK is installable (not Play Store-ready).
+    signingConfigs {
+        release {
+            if (hasReleaseSigning) {
+                storeFile file(releaseKeystorePath)
+                storePassword env['ANDROID_KEYSTORE_PASSWORD']
+                keyAlias env['ANDROID_KEY_ALIAS']
+                keyPassword env['ANDROID_KEY_PASSWORD']
+            }
+        }
+    }
     defaultConfig {
         applicationId "com.beastconsumer.alugarg"
         minSdkVersion rootProject.ext.minSdkVersion
@@ -18,6 +40,7 @@ android {
     }
     buildTypes {
         release {
+            signingConfig hasReleaseSigning ? signingConfigs.release : signingConfigs.debug
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

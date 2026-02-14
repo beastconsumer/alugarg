@@ -115,3 +115,12 @@ npm run dev
 - O projeto foi migrado para React web e nao depende mais de Flutter para execucao principal.
 - Se o bucket nao existir, o app mostra erro explicito de configuracao.
 - O script `run_android.ps1` sobe o Vite, faz `adb reverse` e abre `http://localhost:5173` no emulador Android.
+
+## Release do APK no GitHub
+- O workflow `.github/workflows/android-release.yml` cria um Release no GitHub quando voce sobe uma tag `v*` (ex.: `v1.0.0`) e anexa o APK.
+- Sem secrets de assinatura, o APK sai assinado com chave de debug (instalavel, mas nao serve para Play Store/atualizacoes).
+- Para assinar corretamente (recomendado), crie GitHub Secrets:
+  - `ANDROID_KEYSTORE_BASE64` (keystore em base64)
+  - `ANDROID_KEYSTORE_PASSWORD`
+  - `ANDROID_KEY_ALIAS`
+  - `ANDROID_KEY_PASSWORD`
