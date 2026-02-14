@@ -297,7 +297,7 @@ export function PropertyDetailPage() {
 
   if (loading) {
     return (
-      <Stack py="md" pb={96}>
+      <Stack py="md">
         <Text c="dimmed">Carregando imovel...</Text>
       </Stack>
     );
@@ -305,7 +305,7 @@ export function PropertyDetailPage() {
 
   if (!property) {
     return (
-      <Stack py="md" pb={96}>
+      <Stack py="md">
         <Alert color="red" icon={<AlertCircle size={16} />}>
           {errorMessage || 'Imovel nao encontrado.'}
         </Alert>
@@ -319,7 +319,7 @@ export function PropertyDetailPage() {
   const photos = photosRaw.length >= 5 ? photosRaw : [...photosRaw, ...Array(5 - photosRaw.length).fill(photosRaw[0])];
 
   return (
-    <Stack gap="lg" py="md" pb={96}>
+    <Stack gap="lg" py="md">
       <Modal opened={showAllPhotosModal} onClose={() => setShowAllPhotosModal(false)} size="xl" title="Todas as fotos">
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
           {photosRaw.map((photo, index) => (

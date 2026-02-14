@@ -221,7 +221,7 @@ export function ChatPage() {
 
   if (loading) {
     return (
-      <Stack py="md" pb={96}>
+      <Stack py="md">
         <Text c="dimmed">Carregando chat...</Text>
       </Stack>
     );
@@ -229,7 +229,7 @@ export function ChatPage() {
 
   if (!conversation) {
     return (
-      <Stack py="md" pb={96}>
+      <Stack py="md">
         <Alert color="red" icon={<AlertCircle size={16} />}>
           {errorMessage || 'Conversa nao disponivel.'}
         </Alert>
@@ -243,7 +243,7 @@ export function ChatPage() {
   const statusMeta = conversationStatusMeta[conversation.status];
 
   return (
-    <Stack gap="md" py="md" pb={96}>
+    <Stack gap="md" py="md">
       <Group justify="space-between" align="center">
         <Button variant="subtle" leftSection={<ArrowLeft size={16} />} onClick={() => navigate(-1)}>
           Voltar

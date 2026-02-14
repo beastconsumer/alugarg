@@ -50,7 +50,8 @@ canvas {
   min-height: 100dvh; 
   display: grid; 
   place-items: center; 
-  padding: 20px; 
+  padding: calc(20px + env(safe-area-inset-top, 0px)) calc(20px + env(safe-area-inset-right, 0px))
+    calc(20px + env(safe-area-inset-bottom, 0px)) calc(20px + env(safe-area-inset-left, 0px)); 
   background-position: center; 
   background-size: cover; 
 } 
@@ -71,7 +72,8 @@ canvas {
   min-height: 100dvh;
   display: grid;
   place-items: center;
-  padding: 24px 16px;
+  padding: calc(24px + env(safe-area-inset-top, 0px)) calc(16px + env(safe-area-inset-right, 0px))
+    calc(24px + env(safe-area-inset-bottom, 0px)) calc(16px + env(safe-area-inset-left, 0px));
   background-position: center;
   background-size: cover;
   overflow: hidden;
@@ -138,7 +140,8 @@ canvas {
   min-height: 100dvh; 
   display: grid; 
   place-items: center; 
-  padding: 28px 18px; 
+  padding: calc(28px + env(safe-area-inset-top, 0px)) calc(18px + env(safe-area-inset-right, 0px))
+    calc(28px + env(safe-area-inset-bottom, 0px)) calc(18px + env(safe-area-inset-left, 0px)); 
   background-position: center; 
   background-size: cover; 
   overflow: hidden; 
@@ -319,7 +322,8 @@ canvas {
   display: flex;  
   align-items: center;  
   justify-content: center;
-  padding: 24px 16px;
+  padding: calc(24px + env(safe-area-inset-top, 0px)) calc(16px + env(safe-area-inset-right, 0px))
+    calc(24px + env(safe-area-inset-bottom, 0px)) calc(16px + env(safe-area-inset-left, 0px));
   font-family: 'Manrope', 'Segoe UI', system-ui, sans-serif;
   background:
     linear-gradient(160deg, rgba(4, 13, 39, 0.76), rgba(6, 24, 58, 0.5)),
@@ -332,7 +336,8 @@ canvas {
   min-height: 100dvh;  
   display: grid;  
   place-items: center;  
-  padding: 30px 18px;  
+  padding: calc(30px + env(safe-area-inset-top, 0px)) calc(18px + env(safe-area-inset-right, 0px))
+    calc(30px + env(safe-area-inset-bottom, 0px)) calc(18px + env(safe-area-inset-left, 0px));  
   font-family: 'Manrope', 'Segoe UI', system-ui, sans-serif;  
   background:  
     radial-gradient(circle at 90% 16%, rgba(11, 95, 255, 0.1), transparent 40%),
@@ -443,7 +448,8 @@ canvas {
   display: flex; 
   align-items: center; 
   justify-content: center;
-  padding: 36px 20px;
+  padding: calc(36px + env(safe-area-inset-top, 0px)) calc(20px + env(safe-area-inset-right, 0px))
+    calc(36px + env(safe-area-inset-bottom, 0px)) calc(20px + env(safe-area-inset-left, 0px));
   overflow: hidden;
   font-family: 'Manrope', 'Segoe UI', system-ui, sans-serif;
   background:
@@ -648,6 +654,7 @@ canvas {
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
+  padding-top: env(safe-area-inset-top, 0px);
   padding-bottom: calc(108px + env(safe-area-inset-bottom));
 }
 
@@ -1743,15 +1750,18 @@ canvas {
   }
 
   .auth-gate-shell {
-    padding: 18px 12px;
+    padding: calc(18px + env(safe-area-inset-top, 0px)) calc(12px + env(safe-area-inset-right, 0px))
+      calc(18px + env(safe-area-inset-bottom, 0px)) calc(12px + env(safe-area-inset-left, 0px));
   }
 
   .auth-air-shell { 
-    padding: 24px 14px; 
+    padding: calc(24px + env(safe-area-inset-top, 0px)) calc(14px + env(safe-area-inset-right, 0px))
+      calc(24px + env(safe-area-inset-bottom, 0px)) calc(14px + env(safe-area-inset-left, 0px)); 
   } 
  
   .auth-entry-shell { 
-    padding: 22px 14px; 
+    padding: calc(22px + env(safe-area-inset-top, 0px)) calc(14px + env(safe-area-inset-right, 0px))
+      calc(22px + env(safe-area-inset-bottom, 0px)) calc(14px + env(safe-area-inset-left, 0px)); 
   } 
  
   .auth-entry-grid { 
@@ -1763,7 +1773,8 @@ canvas {
   } 
  
   .auth-login-shell { 
-    padding: 24px 16px; 
+    padding: calc(24px + env(safe-area-inset-top, 0px)) calc(16px + env(safe-area-inset-right, 0px))
+      calc(24px + env(safe-area-inset-bottom, 0px)) calc(16px + env(safe-area-inset-left, 0px)); 
   } 
 
   .auth-login-grid {

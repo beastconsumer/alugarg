@@ -206,7 +206,7 @@ export function HomePage() {
   };
 
   return (
-    <Stack gap="lg" py="md" pb={96}>
+    <Stack gap="lg" py="md">
       <Card radius="xl" withBorder p={isMobile ? 'md' : 'lg'} className="home-air-shell">
         <Stack gap="lg">
           <Group justify="space-between" align="center" gap="sm" wrap="nowrap" className="home-air-tabs-row">

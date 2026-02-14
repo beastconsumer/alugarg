@@ -16,7 +16,7 @@ import {
   Textarea,
   Title,
 } from '@mantine/core';
-import { LogOut, Star, Upload } from 'lucide-react';
+import { LogOut, ShieldCheck, Star, Upload } from 'lucide-react';
 import { useAuth } from '../state/AuthContext';
 import { formatDate, formatMoney } from '../lib/format';
 import { supabase, uploadImageAndGetPublicUrl } from '../lib/supabase';
@@ -52,6 +52,7 @@ export function ProfilePage() {
   const { user, profile, refreshProfile, signOut } = useAuth();
   const displayName = (profile?.name || 'Perfil').trim();
   const displayNameShort = displayName.split(' ').slice(0, 2).join(' ');
+  const isAdmin = profile?.role === 'admin';
 
   const [name, setName] = useState(profile?.name ?? '');
   const [phone, setPhone] = useState(profile?.phone ?? '');
@@ -230,7 +231,7 @@ export function ProfilePage() {
   };
 
   return (
-    <Stack gap="md" py="md" pb={96}>
+    <Stack gap="md" py="md">
       <Group justify="space-between" align="center">
         <Title order={2}>Perfil</Title>
         <Button color="red" variant="light" leftSection={<LogOut size={16} />} onClick={() => void signOut()}>
@@ -272,6 +273,18 @@ export function ProfilePage() {
           <Button component={Link} to="/app/announce" fullWidth>
             {hostCtaLabel}
           </Button>
+
+          {isAdmin ? (
+            <Button
+              component="a"
+              href="/admin.html"
+              variant="default"
+              fullWidth
+              leftSection={<ShieldCheck size={16} />}
+            >
+              Painel admin
+            </Button>
+          ) : null}
         </Stack>
       </Card>
 

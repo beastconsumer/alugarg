@@ -1,0 +1,16 @@
+{
+  "name": "Aluga Aluga",
+  "short_name": "Aluga",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f5f2",
+  "theme_color": "#0b1f3b",
+  "icons": [
+    {
+      "src": "/logoapp.png",
+      "sizes": "any",
+      "type": "image/png"
+    }
+  ]
+}
+

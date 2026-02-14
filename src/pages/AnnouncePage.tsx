@@ -292,7 +292,7 @@ export function AnnouncePage() {
 
   if (!isVerifiedHost) {
     return (
-      <Stack gap="md" py="md" pb={96}>
+      <Stack gap="md" py="md">
         <Card withBorder radius="xl" p="lg" className="host-hero-card">
           <Stack gap={6}>
             <Badge color="dark" variant="light">
@@ -468,7 +468,7 @@ export function AnnouncePage() {
   }
 
   return (
-    <Stack gap="md" py="md" pb={96}>
+    <Stack gap="md" py="md">
       <Card withBorder radius="xl" p="lg">
         <Stack gap={6}>
           <Title order={2}>Anunciar imovel</Title>

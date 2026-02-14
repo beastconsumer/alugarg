@@ -486,7 +486,7 @@ export function BookingCheckoutPage() {
 
   if (loading) {
     return (
-      <Stack py="md" pb={96}>
+      <Stack py="md">
         <Text c="dimmed">Carregando checkout...</Text>
       </Stack>
     );
@@ -494,7 +494,7 @@ export function BookingCheckoutPage() {
 
   if (!property) {
     return (
-      <Stack py="md" pb={96}>
+      <Stack py="md">
         <Alert color="red" icon={<AlertCircle size={16} />}>
           {errorMessage || 'Nao foi possivel abrir o checkout.'}
         </Alert>
@@ -507,7 +507,7 @@ export function BookingCheckoutPage() {
   const checkOutLabel = safeFormatDate(checkOutDate);
 
   return (
-    <Stack gap="md" py="md" pb={96}>
+    <Stack gap="md" py="md">
       <Group justify="space-between" align="center">
         <Button variant="subtle" leftSection={<ArrowLeft size={16} />} onClick={() => navigate(-1)}>
           Voltar

@@ -266,7 +266,7 @@ export function EditPropertyPage() {
 
   if (loading) {
     return (
-      <Stack py="md" pb={96}>
+      <Stack py="md">
         <Text c="dimmed">Carregando anuncio...</Text>
       </Stack>
     );
@@ -274,14 +274,14 @@ export function EditPropertyPage() {
 
   if (!property) {
     return (
-      <Stack py="md" pb={96}>
+      <Stack py="md">
         <Alert color="red">Anuncio nao encontrado.</Alert>
       </Stack>
     );
   }
 
   return (
-    <Stack gap="md" py="md" pb={96}>
+    <Stack gap="md" py="md">
       <Card withBorder radius="xl" p="lg">
         <Stack gap={6}>
           <Title order={2}>Editar anuncio</Title>

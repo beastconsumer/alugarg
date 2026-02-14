@@ -185,7 +185,7 @@ export function MapPage() {
   );
 
   return (
-    <Stack gap="md" py="md" pb={96}>
+    <Stack gap="md" py="md">
       <Card withBorder radius="xl" p="lg">
         <Stack gap="xs">
           <Title order={2}>Mapa</Title>
