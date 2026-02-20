@@ -12,8 +12,10 @@ import { BookingsPage } from './pages/BookingsPage';
 import { ChatPage } from './pages/ChatPage';
 import { EditPropertyPage } from './pages/EditPropertyPage';
 import { HomePage } from './pages/HomePage';
+import { LegalTermsPage } from './pages/LegalTermsPage';
 import { LoginPage } from './pages/LoginPage';
 import { MapPage } from './pages/MapPage';
+import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { PropertyDetailPage } from './pages/PropertyDetailPage';
 import { SignUpPage } from './pages/SignUpPage';
@@ -43,6 +45,8 @@ export function AppRouter() {
       <Route path="/auth/callback" element={<AuthCallbackPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignUpPage />} />
+      <Route path="/termos-de-uso" element={<LegalTermsPage />} />
+      <Route path="/politica-de-privacidade" element={<PrivacyPolicyPage />} />
 
       <Route
         path="/app"

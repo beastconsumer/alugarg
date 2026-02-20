@@ -5,6 +5,7 @@ import {
   Anchor,
   Box,
   Button,
+  Checkbox,
   Container,
   Paper,
   PasswordInput,
@@ -29,6 +30,7 @@ export function SignUpPage() {
   const [email, setEmail] = useState('');
   const [birthDateText, setBirthDateText] = useState('');
   const [password, setPassword] = useState('');
+  const [acceptLegal, setAcceptLegal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -44,6 +46,11 @@ export function SignUpPage() {
 
     if (!strongPasswordRegex.test(password)) {
       setErrorMessage('Senha fraca. Use 8+ caracteres com maiuscula, minuscula, numero e simbolo.');
+      return;
+    }
+
+    if (!acceptLegal) {
+      setErrorMessage('Voce precisa aceitar os Termos de Uso e a Politica de Privacidade.');
       return;
     }
 
@@ -167,6 +174,24 @@ export function SignUpPage() {
                   value={password}
                   onChange={(event) => setPassword(event.currentTarget.value)}
                   required
+                />
+
+                <Checkbox
+                  checked={acceptLegal}
+                  onChange={(event) => setAcceptLegal(event.currentTarget.checked)}
+                  label={
+                    <span>
+                      Li e aceito os{' '}
+                      <Anchor component={Link} to="/termos-de-uso" fw={700}>
+                        Termos de Uso
+                      </Anchor>{' '}
+                      e a{' '}
+                      <Anchor component={Link} to="/politica-de-privacidade" fw={700}>
+                        Politica de Privacidade
+                      </Anchor>
+                      .
+                    </span>
+                  }
                 />
 
                 {errorMessage ? (

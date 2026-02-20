@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { motion } from 'framer-motion';
 import {
   Badge,
   Button,
@@ -15,8 +16,13 @@ import { DatePicker, type DatesRangeValue } from '@mantine/dates';
 import { useMediaQuery } from '@mantine/hooks';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { BellRing, Building2, Minus, PartyPopper, Plus, Search } from 'lucide-react';
+import { Minus, Plus, Search } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import UseAnimations from 'react-useanimations';
+import homeAnimated from 'react-useanimations/lib/home';
+import settingsAnimated from 'react-useanimations/lib/settings2';
+import starAnimated from 'react-useanimations/lib/star';
+import userPlusAnimated from 'react-useanimations/lib/userPlus';
 import { PropertyCard } from '../components/PropertyCard';
 import { seedProperties } from '../lib/seedProperties';
 import { supabase } from '../lib/supabase';
@@ -64,7 +70,7 @@ const formatDateRange = (value: DatesRangeValue): string => {
 };
 
 export function HomePage() {
-  const isMobile = useMediaQuery('(max-width: 680px)');
+  const isMobile = useMediaQuery('(max-width: 900px)');
 
   const [allProperties, setAllProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
@@ -217,38 +223,57 @@ export function HomePage() {
                 onClick={() => setCategory('acomodacoes')}
               >
                 <span className="home-air-tab-icon">
-                  <Building2 size={16} />
+                  <UseAnimations
+                    animation={homeAnimated}
+                    size={18}
+                    strokeColor={category === 'acomodacoes' ? '#1f5ed6' : '#64748b'}
+                    autoplay
+                  />
                 </span>
                 <span>Acomodacoes</span>
               </button>
 
-              <button
+              <motion.button
                 type="button"
                 className={`home-air-tab ${category === 'experiencias' ? 'active' : ''}`}
                 onClick={() => setCategory('experiencias')}
+                whileHover={{ y: -1 }}
+                whileTap={{ scale: 0.99 }}
               >
                 <span className="home-air-tab-icon">
-                  <PartyPopper size={16} />
+                  <UseAnimations
+                    animation={starAnimated}
+                    size={18}
+                    strokeColor={category === 'experiencias' ? '#1f5ed6' : '#64748b'}
+                    autoplay
+                  />
                 </span>
                 <span>Experiencias</span>
                 <Badge size="xs" color="dark" variant="light">
                   NOVO
                 </Badge>
-              </button>
+              </motion.button>
 
-              <button
+              <motion.button
                 type="button"
                 className={`home-air-tab ${category === 'servicos' ? 'active' : ''}`}
                 onClick={() => setCategory('servicos')}
+                whileHover={{ y: -1 }}
+                whileTap={{ scale: 0.99 }}
               >
                 <span className="home-air-tab-icon">
-                  <BellRing size={16} />
+                  <UseAnimations
+                    animation={settingsAnimated}
+                    size={18}
+                    strokeColor={category === 'servicos' ? '#1f5ed6' : '#64748b'}
+                    autoplay
+                  />
                 </span>
                 <span>Servicos</span>
                 <Badge size="xs" color="dark" variant="light">
                   NOVO
                 </Badge>
-              </button>
+              </motion.button>
             </Group>
 
             <Button
@@ -258,6 +283,7 @@ export function HomePage() {
               size={isMobile ? 'sm' : 'md'}
               radius="xl"
               className="home-air-host-btn"
+              leftSection={<UseAnimations animation={userPlusAnimated} size={18} strokeColor="#334155" autoplay />}
             >
               Torne-se um anfitriao
             </Button>
@@ -268,10 +294,11 @@ export function HomePage() {
               <Popover
                 opened={whereOpen}
                 onChange={setWhereOpen}
-                width={isMobile ? 'calc(100vw - 44px)' : 360}
+                width={isMobile ? 'min(94vw, 420px)' : 360}
                 position={isMobile ? 'bottom' : 'bottom-start'}
                 shadow="md"
                 offset={10}
+                zIndex={1100}
                 withinPortal
               >
                 <Popover.Target>
@@ -318,10 +345,11 @@ export function HomePage() {
               <Popover
                 opened={whenOpen}
                 onChange={setWhenOpen}
-                width={isMobile ? 'calc(100vw - 44px)' : 760}
+                width={isMobile ? 'min(96vw, 760px)' : 760}
                 position="bottom"
                 shadow="md"
                 offset={10}
+                zIndex={1100}
                 withinPortal
               >
                 <Popover.Target>
@@ -364,10 +392,11 @@ export function HomePage() {
               <Popover
                 opened={whoOpen}
                 onChange={setWhoOpen}
-                width={isMobile ? 'calc(100vw - 44px)' : 360}
+                width={isMobile ? 'min(94vw, 420px)' : 360}
                 position={isMobile ? 'bottom' : 'bottom-end'}
                 shadow="md"
                 offset={10}
+                zIndex={1100}
                 withinPortal
               >
                 <Popover.Target>
@@ -455,7 +484,8 @@ export function HomePage() {
                 </Popover.Dropdown>
               </Popover>
 
-              <Button
+              <motion.div whileHover={{ y: -1 }} whileTap={{ scale: 0.99 }}>
+                <Button
                 className="home-air-search-submit"
                 radius="xl"
                 leftSection={<Search size={16} />}
@@ -468,6 +498,7 @@ export function HomePage() {
               >
                 Buscar
               </Button>
+              </motion.div>
             </div>
           </div>
         </Stack>

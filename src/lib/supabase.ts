@@ -56,6 +56,10 @@ export const uploadPrivateDocumentAndGetPath = async (
   storagePath: string,
   bucket = 'host-documents',
 ): Promise<string> => {
+  if (!file.type.startsWith('image/')) {
+    throw new Error('Arquivo invalido para documento. Envie uma imagem.');
+  }
+
   const compressed = await compressImage(file, {
     maxSizeMB: 2,
     maxWidthOrHeight: 2000,
@@ -71,7 +75,9 @@ export const uploadPrivateDocumentAndGetPath = async (
     });
 
   if (uploadError) {
-    throw uploadError;
+    const status = (uploadError as { statusCode?: string }).statusCode;
+    const suffix = status ? ` [status ${status}]` : '';
+    throw new Error(`Falha no upload do documento${suffix}: ${uploadError.message}`);
   }
 
   return storagePath;

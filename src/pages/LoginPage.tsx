@@ -169,7 +169,15 @@ export function LoginPage() {
                 </Button>
               ) : (
                 <Text className="auth-air-policy" size="xs" c="dimmed">
-                  Continuando, voce concorda com nossos termos e confirma que leu nossa politica de privacidade.
+                  Continuando, voce concorda com nossos{' '}
+                  <Anchor component={Link} to="/termos-de-uso" fw={700}>
+                    Termos de Uso
+                  </Anchor>{' '}
+                  e confirma que leu nossa{' '}
+                  <Anchor component={Link} to="/politica-de-privacidade" fw={700}>
+                    Politica de Privacidade
+                  </Anchor>
+                  .
                 </Text>
               )}
             </Stack>
@@ -234,4 +242,3 @@ export function LoginPage() {
     </Box>
   );
 }
-

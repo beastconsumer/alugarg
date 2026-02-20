@@ -26,10 +26,7 @@ body,
 }
 
 body {
-  background:
-    radial-gradient(circle at -4% 4%, rgba(47, 91, 255, 0.16), transparent 36%),
-    radial-gradient(circle at 104% 10%, rgba(200, 162, 74, 0.08), transparent 34%),
-    linear-gradient(180deg, #f7f5f2 0%, #eef2f7 100%);
+  background: #ffffff;
   color: var(--brand-text);
   overflow-x: hidden;
 }
@@ -52,14 +49,11 @@ canvas {
   place-items: center; 
   padding: calc(20px + env(safe-area-inset-top, 0px)) calc(20px + env(safe-area-inset-right, 0px))
     calc(20px + env(safe-area-inset-bottom, 0px)) calc(20px + env(safe-area-inset-left, 0px)); 
-  background-position: center; 
-  background-size: cover; 
+  background: #ffffff;
 } 
 
 .auth-hero .overlay {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(160deg, rgba(4, 13, 39, 0.75), rgba(6, 24, 58, 0.45));
+  display: none;
 }
 
 .auth-entry-container { 
@@ -74,18 +68,13 @@ canvas {
   place-items: center;
   padding: calc(24px + env(safe-area-inset-top, 0px)) calc(16px + env(safe-area-inset-right, 0px))
     calc(24px + env(safe-area-inset-bottom, 0px)) calc(16px + env(safe-area-inset-left, 0px));
-  background-position: center;
-  background-size: cover;
+  background: #ffffff;
   overflow: hidden;
   font-family: 'Manrope', 'Segoe UI', system-ui, sans-serif;
 }
 
 .auth-gate-overlay {
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(circle at 10% 12%, rgba(255, 255, 255, 0.14), transparent 38%),
-    linear-gradient(160deg, rgba(5, 12, 28, 0.72), rgba(11, 28, 58, 0.42));
+  display: none;
 }
 
 .auth-gate-container {
@@ -142,35 +131,17 @@ canvas {
   place-items: center; 
   padding: calc(28px + env(safe-area-inset-top, 0px)) calc(18px + env(safe-area-inset-right, 0px))
     calc(28px + env(safe-area-inset-bottom, 0px)) calc(18px + env(safe-area-inset-left, 0px)); 
-  background-position: center; 
-  background-size: cover; 
+  background: #ffffff;
   overflow: hidden; 
   font-family: 'Manrope', 'Segoe UI', system-ui, sans-serif; 
 } 
 
 .auth-entry-overlay { 
-  position: absolute; 
-  inset: 0; 
-  background: 
-    radial-gradient(circle at 10% 15%, rgba(255, 56, 92, 0.22), transparent 40%), 
-    radial-gradient(circle at 92% 18%, rgba(11, 95, 255, 0.18), transparent 42%), 
-    linear-gradient(160deg, rgba(4, 13, 39, 0.78), rgba(6, 24, 58, 0.5)); 
+  display: none;
 } 
 
 .auth-entry-overlay::after { 
-  content: ''; 
-  position: absolute; 
-  inset: 0; 
-  background: repeating-linear-gradient( 
-    90deg, 
-    rgba(255, 255, 255, 0.06), 
-    rgba(255, 255, 255, 0.06) 1px, 
-    transparent 1px, 
-    transparent 90px 
-  ); 
-  opacity: 0.35; 
-  mix-blend-mode: overlay; 
-  pointer-events: none; 
+  display: none;
 } 
 
 .auth-entry-card { 
@@ -325,11 +296,7 @@ canvas {
   padding: calc(24px + env(safe-area-inset-top, 0px)) calc(16px + env(safe-area-inset-right, 0px))
     calc(24px + env(safe-area-inset-bottom, 0px)) calc(16px + env(safe-area-inset-left, 0px));
   font-family: 'Manrope', 'Segoe UI', system-ui, sans-serif;
-  background:
-    linear-gradient(160deg, rgba(4, 13, 39, 0.76), rgba(6, 24, 58, 0.5)),
-    url('/background.png');
-  background-size: cover;
-  background-position: center;
+  background: #ffffff;
 }  
   
 .auth-air-shell {  
@@ -339,12 +306,7 @@ canvas {
   padding: calc(30px + env(safe-area-inset-top, 0px)) calc(18px + env(safe-area-inset-right, 0px))
     calc(30px + env(safe-area-inset-bottom, 0px)) calc(18px + env(safe-area-inset-left, 0px));  
   font-family: 'Manrope', 'Segoe UI', system-ui, sans-serif;  
-  background:  
-    radial-gradient(circle at 90% 16%, rgba(11, 95, 255, 0.1), transparent 40%),
-    linear-gradient(160deg, rgba(4, 13, 39, 0.7), rgba(6, 24, 58, 0.46)),
-    url('/background.png');
-  background-size: cover;
-  background-position: center;
+  background: #ffffff;
 }  
  
 .auth-air-container { 
@@ -656,11 +618,13 @@ canvas {
   flex-direction: column;
   padding-top: env(safe-area-inset-top, 0px);
   padding-bottom: calc(108px + env(safe-area-inset-bottom));
+  background: #ffffff;
 }
 
 .app-content {
   flex: 1;
   width: 100%;
+  background: #ffffff;
 }
 
 .bottom-nav {
@@ -1299,6 +1263,15 @@ canvas {
   padding-left: 18px;
   color: #111827;
   line-height: 1.5;
+}
+
+.host-document-preview {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid #dbe3f3;
+  background: #f8fafc;
 }
 
 .host-hero-card {

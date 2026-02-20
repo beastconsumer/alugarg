@@ -1,8 +1,10 @@
-﻿import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { motion } from 'framer-motion';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   ActionIcon,
   Alert,
+  Anchor,
   Badge,
   Button,
   Card,
@@ -22,6 +24,10 @@ import {
   Title,
 } from '@mantine/core';
 import { ImagePlus, Star, Trash2 } from 'lucide-react';
+import UseAnimations from 'react-useanimations';
+import alertCircleAnimated from 'react-useanimations/lib/alertCircle';
+import checkmarkAnimated from 'react-useanimations/lib/checkmark';
+import infoAnimated from 'react-useanimations/lib/info';
 import { useAuth } from '../state/AuthContext';
 import { env } from '../env';
 import { formatDate } from '../lib/format';
@@ -43,6 +49,32 @@ const createPhotoDrafts = (files: File[]): DraftPhoto[] =>
     previewUrl: URL.createObjectURL(file),
   }));
 
+const allowedDocumentMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
+const maxDocumentSizeBytes = 12 * 1024 * 1024;
+
+const formatFileSize = (sizeBytes: number): string => {
+  if (sizeBytes >= 1024 * 1024) {
+    return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  return `${Math.ceil(sizeBytes / 1024)} KB`;
+};
+
+const validateDocumentFile = (file: File, sideLabel: string): string | null => {
+  if (!allowedDocumentMimeTypes.includes(file.type)) {
+    return `${sideLabel}: use JPG, PNG ou WEBP.`;
+  }
+  if (file.size > maxDocumentSizeBytes) {
+    return `${sideLabel}: tamanho maximo de 12 MB.`;
+  }
+  return null;
+};
+
+const getDocumentTypeLabel = (value: 'rg' | 'cnh' | ''): string => {
+  if (value === 'rg') return 'RG';
+  if (value === 'cnh') return 'CNH';
+  return '-';
+};
+
 export function AnnouncePage() {
   const navigate = useNavigate();
   const { user, profile, refreshProfile } = useAuth();
@@ -53,6 +85,11 @@ export function AnnouncePage() {
   const [documentType, setDocumentType] = useState<'rg' | 'cnh'>('rg');
   const [documentFront, setDocumentFront] = useState<File | null>(null);
   const [documentBack, setDocumentBack] = useState<File | null>(null);
+  const [documentFrontPreviewUrl, setDocumentFrontPreviewUrl] = useState('');
+  const [documentBackPreviewUrl, setDocumentBackPreviewUrl] = useState('');
+  const [documentFrontError, setDocumentFrontError] = useState('');
+  const [documentBackError, setDocumentBackError] = useState('');
+  const [documentSuccessMessage, setDocumentSuccessMessage] = useState('');
   const [submittingDocuments, setSubmittingDocuments] = useState(false);
   const [acceptHostRules, setAcceptHostRules] = useState(false);
   const [forceDocUpload, setForceDocUpload] = useState(false);
@@ -93,12 +130,32 @@ export function AnnouncePage() {
   const isRejectedHost = hostStatus === 'rejected';
   const showDocumentForm = forceDocUpload || hostStatus === 'not_started' || isRejectedHost;
   const hostJourneyStep = isVerifiedHost ? 2 : isPendingHost ? 1 : 0;
+  const canSubmitDocuments =
+    Boolean(documentFront) &&
+    Boolean(documentBack) &&
+    acceptHostRules &&
+    !documentFrontError &&
+    !documentBackError;
+  const submittedDocumentTypeLabel = getDocumentTypeLabel(profile?.host_document_type ?? '');
 
   useEffect(() => {
     return () => {
       photos.forEach((photo) => URL.revokeObjectURL(photo.previewUrl));
     };
   }, [photos]);
+
+  useEffect(() => {
+    if (profile?.host_document_type === 'rg' || profile?.host_document_type === 'cnh') {
+      setDocumentType(profile.host_document_type);
+    }
+  }, [profile?.host_document_type]);
+
+  useEffect(() => {
+    return () => {
+      if (documentFrontPreviewUrl) URL.revokeObjectURL(documentFrontPreviewUrl);
+      if (documentBackPreviewUrl) URL.revokeObjectURL(documentBackPreviewUrl);
+    };
+  }, [documentBackPreviewUrl, documentFrontPreviewUrl]);
 
   const onSelectPhotos = (files: File[] | null) => {
     if (!files || files.length === 0) return;
@@ -151,14 +208,71 @@ export function AnnouncePage() {
     return 'jpg';
   };
 
+  const onChangeDocumentFile = (side: 'front' | 'back', file: File | null) => {
+    if (side === 'front') {
+      setDocumentFrontError('');
+      setDocumentSuccessMessage('');
+      if (documentFrontPreviewUrl) {
+        URL.revokeObjectURL(documentFrontPreviewUrl);
+        setDocumentFrontPreviewUrl('');
+      }
+      if (!file) {
+        setDocumentFront(null);
+        return;
+      }
+      const validationError = validateDocumentFile(file, 'Frente');
+      if (validationError) {
+        setDocumentFront(null);
+        setDocumentFrontError(validationError);
+        return;
+      }
+      setDocumentFront(file);
+      setDocumentFrontPreviewUrl(URL.createObjectURL(file));
+      return;
+    }
+
+    setDocumentBackError('');
+    setDocumentSuccessMessage('');
+    if (documentBackPreviewUrl) {
+      URL.revokeObjectURL(documentBackPreviewUrl);
+      setDocumentBackPreviewUrl('');
+    }
+    if (!file) {
+      setDocumentBack(null);
+      return;
+    }
+    const validationError = validateDocumentFile(file, 'Verso');
+    if (validationError) {
+      setDocumentBack(null);
+      setDocumentBackError(validationError);
+      return;
+    }
+    setDocumentBack(file);
+    setDocumentBackPreviewUrl(URL.createObjectURL(file));
+  };
+
   const submitHostDocuments = async () => {
     if (!user) {
       setErrorMessage('Sessao expirada. Entre novamente.');
       return;
     }
 
+    setDocumentSuccessMessage('');
+    setDocumentFrontError('');
+    setDocumentBackError('');
+
     if (!documentFront || !documentBack) {
       setErrorMessage('Envie frente e verso do documento.');
+      return;
+    }
+
+    const frontValidationError = validateDocumentFile(documentFront, 'Frente');
+    const backValidationError = validateDocumentFile(documentBack, 'Verso');
+
+    if (frontValidationError || backValidationError) {
+      if (frontValidationError) setDocumentFrontError(frontValidationError);
+      if (backValidationError) setDocumentBackError(backValidationError);
+      setErrorMessage('Revise os arquivos antes de enviar.');
       return;
     }
 
@@ -170,10 +284,13 @@ export function AnnouncePage() {
     setSubmittingDocuments(true);
     setErrorMessage('');
 
+    let frontPath = '';
+    let backPath = '';
+
     try {
       const stamp = Date.now();
-      const frontPath = `${user.id}/host-documents/${stamp}-front.${getFileExtension(documentFront)}`;
-      const backPath = `${user.id}/host-documents/${stamp}-back.${getFileExtension(documentBack)}`;
+      frontPath = `${user.id}/host-documents/${stamp}-front.${getFileExtension(documentFront)}`;
+      backPath = `${user.id}/host-documents/${stamp}-back.${getFileExtension(documentBack)}`;
 
       await uploadPrivateDocumentAndGetPath(documentFront, frontPath);
       await uploadPrivateDocumentAndGetPath(documentBack, backPath);
@@ -194,13 +311,33 @@ export function AnnouncePage() {
       await refreshProfile();
       setDocumentFront(null);
       setDocumentBack(null);
+      if (documentFrontPreviewUrl) {
+        URL.revokeObjectURL(documentFrontPreviewUrl);
+        setDocumentFrontPreviewUrl('');
+      }
+      if (documentBackPreviewUrl) {
+        URL.revokeObjectURL(documentBackPreviewUrl);
+        setDocumentBackPreviewUrl('');
+      }
+      setDocumentSuccessMessage('Documentos enviados com sucesso. Sua analise ja foi iniciada.');
       setForceDocUpload(false);
+      setAcceptHostRules(false);
     } catch (error) {
+      if (frontPath || backPath) {
+        await supabase.storage
+          .from('host-documents')
+          .remove([frontPath, backPath].filter(Boolean))
+          .catch(() => null);
+      }
       const message = error instanceof Error ? error.message : 'Falha ao enviar documentos';
       if (message.toLowerCase().includes('bucket')) {
         setErrorMessage('Bucket host-documents nao encontrado no Supabase Storage.');
       } else if (message.toLowerCase().includes('row level security') || message.toLowerCase().includes('permission')) {
         setErrorMessage('Sem permissao para enviar documentos. Entre novamente e tente de novo.');
+      } else if (message.toLowerCase().includes('mime') || message.toLowerCase().includes('content-type')) {
+        setErrorMessage('Formato invalido. Envie JPG, PNG ou WEBP com boa qualidade.');
+      } else if (message.toLowerCase().includes('network') || message.toLowerCase().includes('failed to fetch')) {
+        setErrorMessage('Falha de rede ao enviar documentos. Verifique sua internet e tente novamente.');
       } else {
         setErrorMessage(message);
       }
@@ -323,33 +460,50 @@ export function AnnouncePage() {
             </Stepper>
 
             <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="sm">
-              <Card withBorder radius="lg" p="md" className="host-step-card">
-                <Group gap="sm" wrap="nowrap">
-                  <div className="host-step-index">1</div>
-                  <div>
-                    <Text fw={700}>Documento valido</Text>
-                    <Text size="sm" c="dimmed">RG ou CNH com foto legivel.</Text>
-                  </div>
-                </Group>
-              </Card>
-              <Card withBorder radius="lg" p="md" className="host-step-card">
-                <Group gap="sm" wrap="nowrap">
-                  <div className="host-step-index">2</div>
-                  <div>
-                    <Text fw={700}>Fotos nítidas</Text>
-                    <Text size="sm" c="dimmed">Sem reflexo, sem cortes e sem filtro.</Text>
-                  </div>
-                </Group>
-              </Card>
-              <Card withBorder radius="lg" p="md" className="host-step-card">
-                <Group gap="sm" wrap="nowrap">
-                  <div className="host-step-index">3</div>
-                  <div>
-                    <Text fw={700}>Confirmacao e anuncio</Text>
-                    <Text size="sm" c="dimmed">Validacao em ate 24h uteis.</Text>
-                  </div>
-                </Group>
-              </Card>
+              <motion.div whileHover={{ y: -2 }} transition={{ duration: 0.16 }}>
+                <Card withBorder radius="lg" p="md" className="host-step-card">
+                  <Group gap="sm" wrap="nowrap">
+                    <div className="host-step-index">1</div>
+                    <div>
+                      <Group gap={6} align="center">
+                        <UseAnimations animation={checkmarkAnimated} size={16} strokeColor="#0f766e" autoplay />
+                        <Text fw={700}>Documento valido</Text>
+                      </Group>
+                      <Text size="sm" c="dimmed">RG ou CNH com foto legivel.</Text>
+                    </div>
+                  </Group>
+                </Card>
+              </motion.div>
+
+              <motion.div whileHover={{ y: -2 }} transition={{ duration: 0.16 }}>
+                <Card withBorder radius="lg" p="md" className="host-step-card">
+                  <Group gap="sm" wrap="nowrap">
+                    <div className="host-step-index">2</div>
+                    <div>
+                      <Group gap={6} align="center">
+                        <UseAnimations animation={alertCircleAnimated} size={16} strokeColor="#b45309" autoplay />
+                        <Text fw={700}>Fotos nitidas</Text>
+                      </Group>
+                      <Text size="sm" c="dimmed">Sem reflexo, sem cortes e sem filtro.</Text>
+                    </div>
+                  </Group>
+                </Card>
+              </motion.div>
+
+              <motion.div whileHover={{ y: -2 }} transition={{ duration: 0.16 }}>
+                <Card withBorder radius="lg" p="md" className="host-step-card">
+                  <Group gap="sm" wrap="nowrap">
+                    <div className="host-step-index">3</div>
+                    <div>
+                      <Group gap={6} align="center">
+                        <UseAnimations animation={infoAnimated} size={16} strokeColor="#1f5ed6" autoplay />
+                        <Text fw={700}>Confirmacao e anuncio</Text>
+                      </Group>
+                      <Text size="sm" c="dimmed">Validacao em ate 24h uteis.</Text>
+                    </div>
+                  </Group>
+                </Card>
+              </motion.div>
             </SimpleGrid>
           </Stack>
         </Card>
@@ -359,9 +513,12 @@ export function AnnouncePage() {
             <Stack gap="sm">
               <Group justify="space-between" wrap="wrap">
                 <Stack gap={2}>
-                  <Title order={4} className="host-hero-title">
-                    Documentos recebidos
-                  </Title>
+                  <Group gap={8}>
+                    <UseAnimations animation={checkmarkAnimated} size={20} strokeColor="#0f766e" autoplay />
+                    <Title order={4} className="host-hero-title">
+                      Documentos recebidos
+                    </Title>
+                  </Group>
                   <Text size="sm" c="dimmed">
                     Estamos analisando sua identidade. Em breve liberamos o cadastro do imovel.
                   </Text>
@@ -376,7 +533,14 @@ export function AnnouncePage() {
               <Alert color="blue" variant="light">
                 Assim que a verificacao for aprovada, voce podera cadastrar sua casa e publicar o anuncio.
               </Alert>
-              <Button variant="default" onClick={() => setForceDocUpload(true)}>
+              <Button
+                variant="default"
+                onClick={() => {
+                  setErrorMessage('');
+                  setDocumentSuccessMessage('');
+                  setForceDocUpload(true);
+                }}
+              >
                 Reenviar documentos
               </Button>
             </Stack>
@@ -384,10 +548,18 @@ export function AnnouncePage() {
         ) : null}
 
         {showDocumentForm ? (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.24, ease: 'easeOut' }}
+          >
           <Card withBorder radius="xl" p="lg" className="host-onboard-card">
             <Stack gap="lg">
               <Stack gap={6}>
-                <Title order={4}>Antes de anunciar, precisamos validar sua identidade</Title>
+                <Group gap={8}>
+                  <UseAnimations animation={alertCircleAnimated} size={20} strokeColor="#1f5ed6" autoplay />
+                  <Title order={4}>Antes de anunciar, precisamos validar sua identidade</Title>
+                </Group>
                 <Text c="dimmed">
                   Isso ajuda a manter a plataforma segura para hospedes e anfitrioes.
                 </Text>
@@ -417,6 +589,7 @@ export function AnnouncePage() {
               <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
                 <Select
                   label="Documento"
+                  description="Escolha o documento que voce vai enviar agora."
                   data={[
                     { value: 'rg', label: 'RG' },
                     { value: 'cnh', label: 'CNH' },
@@ -433,35 +606,119 @@ export function AnnouncePage() {
                 />
               </SimpleGrid>
 
+              <Text size="xs" c="dimmed">
+                Ao enviar documentos, voce concorda com os{' '}
+                <Anchor component={Link} to="/termos-de-uso" fw={700}>
+                  Termos de Uso
+                </Anchor>{' '}
+                e com a{' '}
+                <Anchor component={Link} to="/politica-de-privacidade" fw={700}>
+                  Politica de Privacidade
+                </Anchor>
+                .
+              </Text>
+
+              <Card withBorder radius="lg" p="md" className="host-onboard-rules">
+                <Stack gap={4}>
+                  <Group gap={8}>
+                    <UseAnimations animation={infoAnimated} size={18} strokeColor="#1f5ed6" autoplay />
+                    <Text fw={700}>Checklist rapido para aprovacao</Text>
+                  </Group>
+                  <Text size="sm" c="dimmed">
+                    Envie {documentType === 'rg' ? 'RG' : 'CNH'} com boa iluminacao, sem cortes e com dados legiveis.
+                  </Text>
+                  <ul className="host-onboard-list">
+                    <li>Use imagem original da camera, sem print.</li>
+                    <li>Evite reflexo, sombra e desfoque.</li>
+                    <li>Formato aceito: JPG, PNG ou WEBP.</li>
+                    <li>Tamanho maximo por arquivo: 12 MB.</li>
+                  </ul>
+                </Stack>
+              </Card>
+
               <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
                 <FileInput
                   label="Documento - frente"
+                  description="JPG, PNG ou WEBP ate 12 MB."
                   value={documentFront}
-                  onChange={setDocumentFront}
+                  onChange={(file) => onChangeDocumentFile('front', file)}
                   accept="image/*"
                   required
                 />
 
                 <FileInput
                   label="Documento - verso"
+                  description="JPG, PNG ou WEBP ate 12 MB."
                   value={documentBack}
-                  onChange={setDocumentBack}
+                  onChange={(file) => onChangeDocumentFile('back', file)}
                   accept="image/*"
                   required
                 />
               </SimpleGrid>
 
+              {(documentFront || documentBack) ? (
+                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+                  <Card withBorder radius="lg" p="md" className="profile-air-list-card">
+                    <Stack gap={8}>
+                      <Text fw={700}>Frente do documento</Text>
+                      {documentFrontPreviewUrl ? (
+                        <img src={documentFrontPreviewUrl} alt="Preview documento frente" className="host-document-preview" />
+                      ) : null}
+                      <Text size="sm" c="dimmed">
+                        {documentFront ? `${documentFront.name} (${formatFileSize(documentFront.size)})` : 'Nao selecionado'}
+                      </Text>
+                      {documentFront ? (
+                        <Button variant="default" size="xs" onClick={() => onChangeDocumentFile('front', null)}>
+                          Remover frente
+                        </Button>
+                      ) : null}
+                    </Stack>
+                  </Card>
+
+                  <Card withBorder radius="lg" p="md" className="profile-air-list-card">
+                    <Stack gap={8}>
+                      <Text fw={700}>Verso do documento</Text>
+                      {documentBackPreviewUrl ? (
+                        <img src={documentBackPreviewUrl} alt="Preview documento verso" className="host-document-preview" />
+                      ) : null}
+                      <Text size="sm" c="dimmed">
+                        {documentBack ? `${documentBack.name} (${formatFileSize(documentBack.size)})` : 'Nao selecionado'}
+                      </Text>
+                      {documentBack ? (
+                        <Button variant="default" size="xs" onClick={() => onChangeDocumentFile('back', null)}>
+                          Remover verso
+                        </Button>
+                      ) : null}
+                    </Stack>
+                  </Card>
+                </SimpleGrid>
+              ) : null}
+
+              {documentFrontError ? <Alert color="red">{documentFrontError}</Alert> : null}
+              {documentBackError ? <Alert color="red">{documentBackError}</Alert> : null}
+
+              {hasDocuments ? (
+                <Alert color="gray" variant="light">
+                  Ultimo envio: {submittedDocumentTypeLabel} em{' '}
+                  {profile?.host_verification_submitted_at ? formatDate(profile.host_verification_submitted_at) : 'data nao registrada'}.
+                </Alert>
+              ) : null}
+
               <Alert color="blue" variant="light">
-                As imagens serao salvas no Supabase Storage para validacao de anfitriao.
+                As imagens serao armazenadas com acesso privado e usadas apenas na validacao do anfitriao.
               </Alert>
 
+              {documentSuccessMessage ? <Alert color="teal">{documentSuccessMessage}</Alert> : null}
               {errorMessage ? <Alert color="red">{errorMessage}</Alert> : null}
 
-              <Button loading={submittingDocuments} onClick={() => void submitHostDocuments()}>
+              <motion.div whileHover={{ y: -1 }} whileTap={{ scale: 0.99 }}>
+                <Button loading={submittingDocuments} disabled={!canSubmitDocuments} onClick={() => void submitHostDocuments()}>
                 Enviar documentos e continuar
               </Button>
+              </motion.div>
             </Stack>
           </Card>
+          </motion.div>
         ) : null}
       </Stack>
     );
