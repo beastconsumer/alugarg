@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
-  Badge,
   Button,
   Card,
   Group,
@@ -20,15 +19,11 @@ import { Minus, Plus, Search } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import UseAnimations from 'react-useanimations';
 import homeAnimated from 'react-useanimations/lib/home';
-import settingsAnimated from 'react-useanimations/lib/settings2';
-import starAnimated from 'react-useanimations/lib/star';
 import userPlusAnimated from 'react-useanimations/lib/userPlus';
 import { PropertyCard } from '../components/PropertyCard';
 import { seedProperties } from '../lib/seedProperties';
 import { supabase } from '../lib/supabase';
 import { parseProperty, Property, RentType } from '../lib/types';
-
-type HomeCategory = 'acomodacoes' | 'experiencias' | 'servicos';
 
 type GuestState = {
   adults: number;
@@ -75,8 +70,6 @@ export function HomePage() {
   const [allProperties, setAllProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
-
-  const [category, setCategory] = useState<HomeCategory>('acomodacoes');
 
   const [search, setSearch] = useState('');
   const [destinationInput, setDestinationInput] = useState('');
@@ -184,8 +177,6 @@ export function HomePage() {
     return ranked.slice(0, 14);
   }, [filteredProperties, rowOneProperties]);
 
-  const showingProperties = category === 'acomodacoes';
-
   const closeAllPanels = () => {
     setWhereOpen(false);
     setWhenOpen(false);
@@ -217,63 +208,12 @@ export function HomePage() {
         <Stack gap="lg">
           <Group justify="space-between" align="center" gap="sm" wrap="nowrap" className="home-air-tabs-row">
             <Group className="home-air-tabs" justify="center" gap="xl" wrap="nowrap">
-              <button
-                type="button"
-                className={`home-air-tab ${category === 'acomodacoes' ? 'active' : ''}`}
-                onClick={() => setCategory('acomodacoes')}
-              >
+              <button type="button" className="home-air-tab active" aria-current="page">
                 <span className="home-air-tab-icon">
-                  <UseAnimations
-                    animation={homeAnimated}
-                    size={18}
-                    strokeColor={category === 'acomodacoes' ? '#1f5ed6' : '#64748b'}
-                    autoplay
-                  />
+                  <UseAnimations animation={homeAnimated} size={18} strokeColor="#1f5ed6" autoplay />
                 </span>
                 <span>Acomodacoes</span>
               </button>
-
-              <motion.button
-                type="button"
-                className={`home-air-tab ${category === 'experiencias' ? 'active' : ''}`}
-                onClick={() => setCategory('experiencias')}
-                whileHover={{ y: -1 }}
-                whileTap={{ scale: 0.99 }}
-              >
-                <span className="home-air-tab-icon">
-                  <UseAnimations
-                    animation={starAnimated}
-                    size={18}
-                    strokeColor={category === 'experiencias' ? '#1f5ed6' : '#64748b'}
-                    autoplay
-                  />
-                </span>
-                <span>Experiencias</span>
-                <Badge size="xs" color="dark" variant="light">
-                  NOVO
-                </Badge>
-              </motion.button>
-
-              <motion.button
-                type="button"
-                className={`home-air-tab ${category === 'servicos' ? 'active' : ''}`}
-                onClick={() => setCategory('servicos')}
-                whileHover={{ y: -1 }}
-                whileTap={{ scale: 0.99 }}
-              >
-                <span className="home-air-tab-icon">
-                  <UseAnimations
-                    animation={settingsAnimated}
-                    size={18}
-                    strokeColor={category === 'servicos' ? '#1f5ed6' : '#64748b'}
-                    autoplay
-                  />
-                </span>
-                <span>Servicos</span>
-                <Badge size="xs" color="dark" variant="light">
-                  NOVO
-                </Badge>
-              </motion.button>
             </Group>
 
             <Button
@@ -285,7 +225,7 @@ export function HomePage() {
               className="home-air-host-btn"
               leftSection={<UseAnimations animation={userPlusAnimated} size={18} strokeColor="#334155" autoplay />}
             >
-              Torne-se um anfitriao
+              Tornar-se anfitriao
             </Button>
           </Group>
 
@@ -508,42 +448,29 @@ export function HomePage() {
       {errorMessage ? <Text c="red">{errorMessage}</Text> : null}
 
       {!loading && !errorMessage ? (
-        showingProperties ? (
-          filteredProperties.length > 0 ? (
-            <Stack gap="xl">
-              <section className="home-carousel-section">
-                <Title order={3}>Acomodacoes em Balneario Cassino</Title>
-                <div className="home-horizontal-scroll">
-                  {rowOneProperties.map((property) => (
-                    <PropertyCard key={property.id} property={property} />
-                  ))}
-                </div>
-              </section>
+        filteredProperties.length > 0 ? (
+          <Stack gap="xl">
+            <section className="home-carousel-section">
+              <Title order={3}>Acomodacoes em Balneario Cassino</Title>
+              <div className="home-horizontal-scroll">
+                {rowOneProperties.map((property) => (
+                  <PropertyCard key={property.id} property={property} />
+                ))}
+              </div>
+            </section>
 
-              <section className="home-carousel-section">
-                <Title order={3}>Acomodacoes muito procuradas em Rio Grande</Title>
-                <div className="home-horizontal-scroll">
-                  {rowTwoProperties.map((property) => (
-                    <PropertyCard key={property.id} property={property} />
-                  ))}
-                </div>
-              </section>
-            </Stack>
-          ) : (
-            <Card withBorder radius="xl" p="lg">
-              <Text c="dimmed">Nenhum imovel encontrado com os filtros atuais.</Text>
-            </Card>
-          )
+            <section className="home-carousel-section">
+              <Title order={3}>Acomodacoes muito procuradas em Rio Grande</Title>
+              <div className="home-horizontal-scroll">
+                {rowTwoProperties.map((property) => (
+                  <PropertyCard key={property.id} property={property} />
+                ))}
+              </div>
+            </section>
+          </Stack>
         ) : (
-          <Card radius="xl" withBorder p="lg" className="home-filter-card">
-            <Stack gap={6}>
-              <Title order={5}>
-                {category === 'experiencias' ? 'Experiencias em breve' : 'Servicos em breve'}
-              </Title>
-              <Text c="dimmed" size="sm">
-                Estamos preparando esta secao. Enquanto isso, explore as acomodacoes.
-              </Text>
-            </Stack>
+          <Card withBorder radius="xl" p="lg">
+            <Text c="dimmed">Nenhum imovel encontrado com os filtros atuais.</Text>
           </Card>
         )
       ) : null}

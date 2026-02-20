@@ -41,7 +41,8 @@ export function AppRouter() {
 
   return (
     <Routes>
-      <Route path="/" element={<AuthEntryPage />} />
+      <Route path="/" element={<Navigate to="/login" replace />} />
+      <Route path="/entrada" element={<AuthEntryPage />} />
       <Route path="/auth/callback" element={<AuthCallbackPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignUpPage />} />

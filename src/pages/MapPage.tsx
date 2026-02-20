@@ -185,11 +185,11 @@ export function MapPage() {
   );
 
   return (
-    <Stack gap="md" py="md">
+    <Stack gap="md" py="md" className="map-page-stack">
       <Card withBorder radius="xl" p="lg">
         <Stack gap="xs">
           <Title order={2}>Mapa</Title>
-          <Text c="dimmed">Casas posicionadas automaticamente pelo endereco em Rio Grande/Cassino.</Text>
+          <Text c="dimmed">Encontre casas perto de voce e abra os detalhes para reservar.</Text>
         </Stack>
       </Card>
 
@@ -209,7 +209,7 @@ export function MapPage() {
       {resolvingPoints && !loading ? <Text c="dimmed">Posicionando casas pelo endereco...</Text> : null}
       {errorMessage ? <Alert color="red">{errorMessage}</Alert> : null}
 
-      <Card withBorder radius="xl" p="xs" className="map-card">
+      <Card withBorder radius="xl" p="xs" className="map-card map-page-map-card">
         <MapContainer center={center} zoom={activeLocation.zoom} scrollWheelZoom className="leaflet-map">
           <RecenterMap center={center} zoom={activeLocation.zoom} />
 

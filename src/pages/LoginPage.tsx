@@ -96,7 +96,7 @@ export function LoginPage() {
             <Title order={3} className="auth-air-title">
               Entrar ou cadastrar
             </Title>
-            <Text className="auth-air-brand">Aluga Aluga</Text>
+            <Text className="auth-air-brand">AlugaSul</Text>
           </Group>
 
           <Text className="auth-air-sub" size="sm">

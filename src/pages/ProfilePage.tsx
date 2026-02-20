@@ -53,6 +53,7 @@ export function ProfilePage() {
   const displayName = (profile?.name || 'Perfil').trim();
   const displayNameShort = displayName.split(' ').slice(0, 2).join(' ');
   const isAdmin = profile?.role === 'admin';
+  const isHost = profile?.host_verification_status === 'verified' || isAdmin;
 
   const [name, setName] = useState(profile?.name ?? '');
   const [phone, setPhone] = useState(profile?.phone ?? '');
@@ -130,13 +131,16 @@ export function ProfilePage() {
       activeProperties: myProperties.filter((item) => item.status === 'approved').length,
       totalBookings: myBookings.length,
       totalReviews: receivedReviews.length,
+      totalGivenReviews: reviewsGiven.length,
     };
-  }, [myBookings.length, myProperties, receivedReviews]);
+  }, [myBookings.length, myProperties, receivedReviews, reviewsGiven.length]);
 
   const hostCtaLabel =
-    profile?.host_verification_status === 'verified' || profile?.host_verification_status === 'pending'
+    profile?.host_verification_status === 'verified'
       ? 'Anunciar meu imovel'
-      : 'Torne-se um anfitriao';
+      : profile?.host_verification_status === 'pending'
+        ? 'Validacao em andamento'
+        : 'Quero ser anfitriao';
 
   const onSaveProfile = async (event: FormEvent) => {
     event.preventDefault();
@@ -288,31 +292,35 @@ export function ProfilePage() {
         </Stack>
       </Card>
 
-      <SimpleGrid cols={{ base: 1, sm: 4 }} spacing="md">
+      <SimpleGrid cols={{ base: 1, sm: isHost ? 4 : 3 }} spacing="md">
+        {isHost ? (
+          <Card withBorder radius="xl" p="md" className="profile-section-card">
+            <Text size="sm" c="dimmed">
+              Anuncios ativos
+            </Text>
+            <Title order={3}>{profileStats.activeProperties}</Title>
+          </Card>
+        ) : null}
         <Card withBorder radius="xl" p="md" className="profile-section-card">
           <Text size="sm" c="dimmed">
-            Anuncios ativos
-          </Text>
-          <Title order={3}>{profileStats.activeProperties}</Title>
-        </Card>
-        <Card withBorder radius="xl" p="md" className="profile-section-card">
-          <Text size="sm" c="dimmed">
-            Reservas
+            Minhas reservas
           </Text>
           <Title order={3}>{profileStats.totalBookings}</Title>
         </Card>
         <Card withBorder radius="xl" p="md" className="profile-section-card">
           <Text size="sm" c="dimmed">
-            Avaliacoes
+            Avaliacoes feitas
           </Text>
-          <Title order={3}>{profileStats.totalReviews}</Title>
+          <Title order={3}>{profileStats.totalGivenReviews}</Title>
         </Card>
-        <Card withBorder radius="xl" p="md" className="profile-section-card">
-          <Text size="sm" c="dimmed">
-            Nota media
-          </Text>
-          <Title order={3}>{profileStats.avgRating > 0 ? profileStats.avgRating.toFixed(1) : '-'}</Title>
-        </Card>
+        {isHost ? (
+          <Card withBorder radius="xl" p="md" className="profile-section-card">
+            <Text size="sm" c="dimmed">
+              Nota media como anfitriao
+            </Text>
+            <Title order={3}>{profileStats.avgRating > 0 ? profileStats.avgRating.toFixed(1) : '-'}</Title>
+          </Card>
+        ) : null}
       </SimpleGrid>
 
       <Card withBorder radius="xl" p="lg" className="profile-section-card">
@@ -339,7 +347,7 @@ export function ProfilePage() {
         </Stack>
       </Card>
 
-      <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
+      <SimpleGrid cols={{ base: 1, md: isHost ? 2 : 1 }} spacing="md">
         <Card withBorder radius="xl" p="lg" className="profile-section-card">
           <Stack gap="md">
             <Title order={4}>Minhas reservas</Title>
@@ -366,35 +374,37 @@ export function ProfilePage() {
           </Stack>
         </Card>
 
-        <Card withBorder radius="xl" p="lg" className="profile-section-card">
-          <Stack gap="md">
-            <Title order={4}>Meus anuncios</Title>
-            {loadingData ? <Text c="dimmed">Carregando...</Text> : null}
-            {myProperties.length === 0 ? <Text c="dimmed">Sem anuncios ainda.</Text> : null}
+        {isHost ? (
+          <Card withBorder radius="xl" p="lg" className="profile-section-card">
+            <Stack gap="md">
+              <Title order={4}>Meus anuncios</Title>
+              {loadingData ? <Text c="dimmed">Carregando...</Text> : null}
+              {myProperties.length === 0 ? <Text c="dimmed">Sem anuncios ainda.</Text> : null}
 
-            {myProperties.slice(0, 3).map((property) => (
-              <Card key={property.id} withBorder radius="lg" p="md" className="profile-air-list-card">
-                <Stack gap={4}>
-                  <Text fw={700}>{property.title}</Text>
-                  <Text size="sm" c="dimmed">
-                    {property.location.addressText || 'Sem endereco'}
-                  </Text>
-                  <Text size="sm">
-                    {formatMoney(property.price)} - {statusLabel[property.status]}
-                  </Text>
-                  <Group>
-                    <Button component={Link} to={`/app/property/${property.id}`} variant="default" size="xs">
-                      Ver
-                    </Button>
-                    <Button component={Link} to={`/app/edit-property/${property.id}`} size="xs">
-                      Editar
-                    </Button>
-                  </Group>
-                </Stack>
-              </Card>
-            ))}
-          </Stack>
-        </Card>
+              {myProperties.slice(0, 3).map((property) => (
+                <Card key={property.id} withBorder radius="lg" p="md" className="profile-air-list-card">
+                  <Stack gap={4}>
+                    <Text fw={700}>{property.title}</Text>
+                    <Text size="sm" c="dimmed">
+                      {property.location.addressText || 'Sem endereco'}
+                    </Text>
+                    <Text size="sm">
+                      {formatMoney(property.price)} - {statusLabel[property.status]}
+                    </Text>
+                    <Group>
+                      <Button component={Link} to={`/app/property/${property.id}`} variant="default" size="xs">
+                        Ver
+                      </Button>
+                      <Button component={Link} to={`/app/edit-property/${property.id}`} size="xs">
+                        Editar
+                      </Button>
+                    </Group>
+                  </Stack>
+                </Card>
+              ))}
+            </Stack>
+          </Card>
+        ) : null}
       </SimpleGrid>
 
       <Card withBorder radius="xl" p="lg" className="profile-section-card">
@@ -460,20 +470,41 @@ export function ProfilePage() {
 
           <Divider />
 
-          <Title order={5}>Ultimas recebidas ({receivedReviews.length})</Title>
-          {receivedReviews.length === 0 ? <Text c="dimmed">Voce ainda nao recebeu avaliacoes.</Text> : null}
-          {receivedReviews.slice(0, 3).map((review) => (
-            <Card key={review.id} withBorder radius="lg" p="md" className="profile-air-list-card">
-              <Stack gap={6}>
-                <Text fw={700}>
-                  <Star size={14} style={{ verticalAlign: 'middle' }} /> Nota: {review.rating}/5
-                </Text>
-                <Text size="sm" c="dimmed">
-                  {review.comment || 'Sem comentario'}
-                </Text>
-              </Stack>
-            </Card>
-          ))}
+          {isHost ? (
+            <>
+              <Title order={5}>Ultimas recebidas ({receivedReviews.length})</Title>
+              {receivedReviews.length === 0 ? <Text c="dimmed">Voce ainda nao recebeu avaliacoes.</Text> : null}
+              {receivedReviews.slice(0, 3).map((review) => (
+                <Card key={review.id} withBorder radius="lg" p="md" className="profile-air-list-card">
+                  <Stack gap={6}>
+                    <Text fw={700}>
+                      <Star size={14} style={{ verticalAlign: 'middle' }} /> Nota: {review.rating}/5
+                    </Text>
+                    <Text size="sm" c="dimmed">
+                      {review.comment || 'Sem comentario'}
+                    </Text>
+                  </Stack>
+                </Card>
+              ))}
+            </>
+          ) : (
+            <>
+              <Title order={5}>Ultimas avaliacoes enviadas ({reviewsGiven.length})</Title>
+              {reviewsGiven.length === 0 ? <Text c="dimmed">Voce ainda nao avaliou nenhuma estadia.</Text> : null}
+              {reviewsGiven.slice(0, 3).map((review) => (
+                <Card key={review.id} withBorder radius="lg" p="md" className="profile-air-list-card">
+                  <Stack gap={6}>
+                    <Text fw={700}>
+                      <Star size={14} style={{ verticalAlign: 'middle' }} /> Nota enviada: {review.rating}/5
+                    </Text>
+                    <Text size="sm" c="dimmed">
+                      {review.comment || 'Sem comentario'}
+                    </Text>
+                  </Stack>
+                </Card>
+              ))}
+            </>
+          )}
         </Stack>
       </Card>
     </Stack>

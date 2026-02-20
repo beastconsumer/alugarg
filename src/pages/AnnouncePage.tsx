@@ -433,7 +433,7 @@ export function AnnouncePage() {
         <Card withBorder radius="xl" p="lg" className="host-hero-card">
           <Stack gap={6}>
             <Badge color="dark" variant="light">
-              Anfitriao Aluga Aluga
+              Anfitriao AlugaSul
             </Badge>
             <Title order={2} className="host-hero-title">
               Que legal que voce quer se tornar um anfitriao.

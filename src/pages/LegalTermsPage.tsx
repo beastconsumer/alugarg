@@ -1,7 +1,11 @@
 import { Anchor, Box, Card, Container, Stack, Text, Title } from '@mantine/core';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../state/AuthContext';
 
 export function LegalTermsPage() {
+  const { session } = useAuth();
+  const backTo = session ? '/app/announce' : '/login';
+
   return (
     <Box py="md">
       <Container size="md">
@@ -15,7 +19,7 @@ export function LegalTermsPage() {
             </Stack>
 
             <Text>
-              Ao utilizar o Aluga Aluga, voce concorda em fornecer informacoes verdadeiras, manter seus dados atualizados
+              Ao utilizar o AlugaSul, voce concorda em fornecer informacoes verdadeiras, manter seus dados atualizados
               e respeitar as regras de convivencia entre hospedes e anfitrioes.
             </Text>
             <Text>
@@ -35,7 +39,7 @@ export function LegalTermsPage() {
               app.
             </Text>
 
-            <Anchor component={Link} to="/login" fw={700}>
+            <Anchor component={Link} to={backTo} fw={700}>
               Voltar para o app
             </Anchor>
           </Stack>
@@ -44,4 +48,3 @@ export function LegalTermsPage() {
     </Box>
   );
 }
-

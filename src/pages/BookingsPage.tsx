@@ -32,7 +32,8 @@ const bookingStatusMeta: Record<
 };
 
 export function BookingsPage() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const isHost = profile?.host_verification_status === 'verified' || profile?.role === 'admin';
 
   const [renterBookings, setRenterBookings] = useState<Booking[]>([]);
   const [ownerBookings, setOwnerBookings] = useState<Booking[]>([]);
@@ -147,7 +148,7 @@ export function BookingsPage() {
       <Card withBorder radius="xl" p="lg">
         <Stack gap="xs">
           <Title order={2}>Reservas</Title>
-          <Text c="dimmed">Fluxo completo de pagamento, check-in e finalizacao de estadia.</Text>
+          <Text c="dimmed">Acompanhe suas viagens, pagamentos e status da hospedagem.</Text>
         </Stack>
       </Card>
 
@@ -156,8 +157,8 @@ export function BookingsPage() {
 
       <Tabs defaultValue="renter" radius="md" keepMounted={false}>
         <Tabs.List>
-          <Tabs.Tab value="renter">Como inquilino</Tabs.Tab>
-          <Tabs.Tab value="owner">Como proprietario</Tabs.Tab>
+          <Tabs.Tab value="renter">Minhas viagens</Tabs.Tab>
+          {isHost ? <Tabs.Tab value="owner">Hospedagens como anfitriao</Tabs.Tab> : null}
         </Tabs.List>
 
         <Tabs.Panel value="renter" pt="md">
@@ -246,7 +247,7 @@ export function BookingsPage() {
                             ) : null}
                             {['pre_checking', 'checked_in', 'checked_out'].includes(normalizedStatus) ? (
                               <Button component={Link} to={`/app/chat?bookingId=${booking.id}`} size="xs" variant="default">
-                                Chat com dono
+                                Chat com anfitriao
                               </Button>
                             ) : null}
 
@@ -266,7 +267,7 @@ export function BookingsPage() {
           </Stack>
         </Tabs.Panel>
 
-        <Tabs.Panel value="owner" pt="md">
+        {isHost ? <Tabs.Panel value="owner" pt="md">
           <Stack gap="md">
             <SimpleGrid cols={{ base: 1, sm: 3 }}>
               <Card withBorder radius="lg" p="md" className="bookings-kpi-card">
@@ -308,7 +309,7 @@ export function BookingsPage() {
 
             <Card withBorder radius="xl" p="lg">
               <Stack gap="md">
-                <Title order={4}>Reservas dos meus imoveis</Title>
+                <Title order={4}>Reservas dos meus anuncios</Title>
                 {ownerBookings.length === 0 ? <Text c="dimmed">Sem reservas nos seus imoveis.</Text> : null}
 
                 {ownerBookings.map((booking) => {
@@ -363,7 +364,7 @@ export function BookingsPage() {
               </Stack>
             </Card>
           </Stack>
-        </Tabs.Panel>
+        </Tabs.Panel> : null}
       </Tabs>
     </Stack>
   );

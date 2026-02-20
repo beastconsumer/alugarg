@@ -1,6 +1,6 @@
 {
-  "name": "Aluga Aluga",
-  "short_name": "Aluga",
+  "name": "AlugaSul",
+  "short_name": "AlugaSul",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f7f5f2",
@@ -13,4 +13,3 @@
     }
   ]
 }
-

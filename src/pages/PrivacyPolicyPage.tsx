@@ -1,7 +1,11 @@
 import { Anchor, Box, Card, Container, Stack, Text, Title } from '@mantine/core';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../state/AuthContext';
 
 export function PrivacyPolicyPage() {
+  const { session } = useAuth();
+  const backTo = session ? '/app/announce' : '/login';
+
   return (
     <Box py="md">
       <Container size="md">
@@ -31,7 +35,7 @@ export function PrivacyPolicyPage() {
               seguranca.
             </Text>
 
-            <Anchor component={Link} to="/login" fw={700}>
+            <Anchor component={Link} to={backTo} fw={700}>
               Voltar para o app
             </Anchor>
           </Stack>
@@ -40,4 +44,3 @@ export function PrivacyPolicyPage() {
     </Box>
   );
 }
-

@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { motion } from 'framer-motion';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ActionIcon,
@@ -20,8 +21,11 @@ import {
 import {
   AlertCircle,
   ArrowLeft,
+  Clock3,
   BedDouble,
+  Cigarette,
   BellRing,
+  Dog,
   Building2,
   CarFront,
   ExternalLink,
@@ -30,6 +34,7 @@ import {
   MapPin,
   Navigation,
   PartyPopper,
+  ShieldBan,
   Share2,
   ShieldCheck,
   Star,
@@ -317,6 +322,14 @@ export function PropertyDetailPage() {
   const reviewCount = getReviewCount(property.id);
   const photosRaw = property.photos.length > 0 ? property.photos : ['/background.png'];
   const photos = photosRaw.length >= 5 ? photosRaw : [...photosRaw, ...Array(5 - photosRaw.length).fill(photosRaw[0])];
+  const stayRules = [
+    { icon: Clock3, text: `Minimo de ${property.minimum_nights} noite(s)` },
+    { icon: Clock3, text: `Check-in: ${property.check_in_time}` },
+    { icon: Clock3, text: `Check-out: ${property.check_out_time}` },
+    { icon: PartyPopper, text: `Festas: ${property.events_allowed ? 'permitidas' : 'nao permitidas'}` },
+    { icon: Cigarette, text: `Fumantes: ${property.smoking_allowed ? 'permitido' : 'nao permitido'}` },
+    { icon: property.pet_friendly ? Dog : ShieldBan, text: property.pet_friendly ? 'Aceita pets' : 'Nao aceita pets' },
+  ];
 
   return (
     <Stack gap="lg" py="md">
@@ -413,7 +426,7 @@ export function PropertyDetailPage() {
             <Group gap="sm">
               <div className="detail-host-avatar">{(owner?.name || 'A').charAt(0).toUpperCase()}</div>
               <div>
-                <Text fw={700}>Anfitriao(a): {owner?.name || 'Equipe Aluga Aluga'}</Text>
+                <Text fw={700}>Anfitriao(a): {owner?.name || 'Equipe AlugaSul'}</Text>
                 <Text c="dimmed" size="sm">
                   Perfil verificado
                 </Text>
@@ -440,10 +453,16 @@ export function PropertyDetailPage() {
                   {(showAllAmenities ? property.amenities : property.amenities.slice(0, 10)).map((item) => {
                     const AmenityIcon = getAmenityIcon(item);
                     return (
-                      <div key={item} className="amenity-item">
-                        <AmenityIcon size={18} />
+                      <motion.div key={item} className="amenity-item" whileHover={{ y: -1 }}>
+                        <motion.span
+                          className="amenity-item-icon"
+                          whileHover={{ rotate: 360 }}
+                          transition={{ duration: 0.7, ease: 'easeInOut' }}
+                        >
+                          <AmenityIcon size={18} />
+                        </motion.span>
                         <Text size="md">{getAmenityLabel(item)}</Text>
-                      </div>
+                      </motion.div>
                     );
                   })}
                 </SimpleGrid>
@@ -469,13 +488,18 @@ export function PropertyDetailPage() {
             <Title order={3} className="detail-section-title">
               Regras e politicas
             </Title>
-            <Group gap="xs" wrap="wrap">
-              <Badge variant="light">Minimo: {property.minimum_nights} noite(s)</Badge>
-              <Badge variant="light">Check-in: {property.check_in_time}</Badge>
-              <Badge variant="light">Check-out: {property.check_out_time}</Badge>
-              <Badge variant="light">Festas: {property.events_allowed ? 'permitido' : 'nao permitido'}</Badge>
-              <Badge variant="light">Fumantes: {property.smoking_allowed ? 'permitido' : 'nao permitido'}</Badge>
-              {property.pet_friendly ? <Badge variant="light">Aceita pets</Badge> : null}
+            <Group gap="xs" wrap="wrap" className="rule-pills">
+              {stayRules.map((rule) => {
+                const RuleIcon = rule.icon;
+                return (
+                  <Badge key={rule.text} variant="light" className="rule-pill">
+                    <span className="rule-pill-content">
+                      <RuleIcon size={14} />
+                      <span>{rule.text}</span>
+                    </span>
+                  </Badge>
+                );
+              })}
             </Group>
 
             {property.house_rules ? (
