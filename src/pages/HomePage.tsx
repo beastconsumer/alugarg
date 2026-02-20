@@ -13,6 +13,7 @@ import {
   Minus,
   Plus,
   Search,
+  Star,
   Users,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -487,7 +488,7 @@ export function HomePage() {
             <section className="home-carousel-section">
               <Group gap={8} align="center" className="home-section-title-row">
                 <span className="home-section-icon" aria-hidden>
-                  <MapPinned size={16} />
+                  <Star size={16} />
                 </span>
                 <Title order={3}>Acomodacoes em Balneario Cassino</Title>
               </Group>

@@ -543,7 +543,7 @@ export function BookingCheckoutPage() {
               </Alert>
             ) : null}
 
-            <Group>
+            <Group wrap="wrap" className="checkout-success-actions">
               <Button component={Link} to={`/app/chat?bookingId=${successBookingId}`}>
                 Abrir chat interno com anfitriao
               </Button>
@@ -672,7 +672,7 @@ export function BookingCheckoutPage() {
 
                           <TextInput label="Codigo PIX copia e cola" value={pixCharge.qrCode} readOnly />
 
-                          <Group>
+                          <Group wrap="wrap" className="checkout-pix-actions">
                             <Button type="button" variant="default" leftSection={<Copy size={14} />} onClick={() => void copyPixCode()}>
                               Copiar codigo
                             </Button>
@@ -727,7 +727,7 @@ export function BookingCheckoutPage() {
                   label="Li e aceito a politica de cancelamento e reembolso."
                 />
 
-                <Group>
+                <Group wrap="wrap" className="checkout-form-actions">
                   <Button type="submit" loading={submitting}>
                     {pixCharge ? 'Gerar novo QR Code' : 'Gerar QR Code PIX'}
                   </Button>

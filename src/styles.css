@@ -17,12 +17,24 @@
   box-sizing: border-box;
 }
 
+button,
+[role='button'],
+.mantine-Button-root,
+.mantine-ActionIcon-root {
+  touch-action: manipulation;
+}
+
 html,
 body,
 #root,
 #admin-root {
   margin: 0;
   min-height: 100%;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -1231,6 +1243,8 @@ canvas {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  animation: none !important;
+  transform: none !important;
 }
 
 .home-section-subtitle {
@@ -1409,6 +1423,10 @@ canvas {
 
 .detail-preference-card {
   border-color: #d9e4f2;
+}
+
+.detail-preference-row {
+  gap: 8px;
 }
 
 .detail-rating-block {
@@ -2037,6 +2055,10 @@ canvas {
     padding-inline: 12px !important;
   }
 
+  .app-content :where(input, textarea, select) {
+    font-size: 16px;
+  }
+
   .home-carousel-section :where(.mantine-Title-root) {
     font-size: 1.25rem;
     letter-spacing: -0.2px;
@@ -2155,7 +2177,7 @@ canvas {
   }
 
   .bottom-nav-label {
-    font-size: 9px;
+    font-size: 10px;
   }
 
   .leaflet-map {
@@ -2271,7 +2293,12 @@ canvas {
   }
 
   .home-listing-item {
-    flex-basis: 82vw;
+    flex-basis: min(84vw, 340px);
+  }
+
+  .home-horizontal-scroll {
+    scroll-padding-inline: 12px;
+    padding-bottom: 10px;
   }
 
   .profile-mobile-id-card {
@@ -2299,6 +2326,22 @@ canvas {
     padding: 12px !important;
   }
 
+  .booking-card-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .booking-card-cover-wrap {
+    width: 100%;
+    min-width: 100%;
+    height: 168px;
+  }
+
+  .booking-card-cover {
+    width: 100%;
+    height: 168px;
+  }
+
   .detail-gallery-grid {
     grid-template-columns: 1fr;
   }
@@ -2322,7 +2365,63 @@ canvas {
     position: static;
   }
 
+  .detail-preference-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .detail-rating-block {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .detail-rating-block :where(.mantine-Group-root) {
+    justify-content: flex-start;
+  }
+
+  .detail-rating-block :where(.mantine-Text-root) {
+    text-align: left !important;
+  }
+
   .checkout-cover-image {
     height: 180px;
+  }
+
+  .map-popup-card {
+    width: min(72vw, 220px);
+  }
+
+  .chat-header-row {
+    align-items: flex-start;
+  }
+
+  .chat-conversation-item {
+    padding-inline: 8px;
+  }
+
+  .chat-conversation-status {
+    display: none;
+  }
+
+  .chat-scroll {
+    max-height: min(54vh, 420px);
+    padding-right: 0;
+  }
+
+  .chat-bubble {
+    max-width: 94%;
+  }
+
+  .chat-compose-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .checkout-success-actions,
+  .checkout-pix-actions,
+  .checkout-form-actions {
+    flex-direction: column;
+    align-items: stretch;
   }
 }

@@ -290,7 +290,7 @@ export function ChatPage() {
 
   return (
     <Stack gap="md" py="md">
-      <Group justify="space-between" align="center">
+      <Group justify="space-between" align="center" className="chat-header-row">
         <Button variant="subtle" leftSection={<ArrowLeft size={16} />} onClick={() => navigate(-1)}>
           Voltar
         </Button>
@@ -309,7 +309,7 @@ export function ChatPage() {
       ) : null}
 
       <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
-        <Card withBorder radius="xl" p="md">
+        <Card withBorder radius="xl" p="md" className="chat-list-card">
           <Stack gap="sm">
             <Title order={4}>Seus chats</Title>
 
@@ -326,7 +326,11 @@ export function ChatPage() {
                     justify="space-between"
                     className="chat-conversation-item"
                     onClick={() => openConversation(conversation.id)}
-                    rightSection={<Badge color={meta.color} size="xs">{meta.label}</Badge>}
+                    rightSection={
+                      <Badge color={meta.color} size="xs" className="chat-conversation-status">
+                        {meta.label}
+                      </Badge>
+                    }
                   >
                     <Stack gap={2} align="flex-start">
                       <Text fw={700} size="sm">
@@ -343,7 +347,7 @@ export function ChatPage() {
           </Stack>
         </Card>
 
-        <Card withBorder radius="xl" p="lg">
+        <Card withBorder radius="xl" p="lg" className="chat-thread-card">
           <Stack gap="sm">
             <Stack gap={4}>
               <Title order={4}>Chat da reserva</Title>
@@ -391,7 +395,7 @@ export function ChatPage() {
                   placeholder="Digite sua mensagem para alinhar check-in e detalhes da reserva..."
                   disabled={!activeConversation || activeConversation.status !== 'open' || !chatUnlocked}
                 />
-                <Group justify="space-between">
+                <Group justify="space-between" className="chat-compose-actions">
                   <Text size="xs" c="dimmed">
                     {draft.length}/1000
                   </Text>

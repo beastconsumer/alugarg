@@ -395,12 +395,12 @@ export function PropertyDetailPage() {
               Espaco inteiro em {property.location.addressText || 'Balneario Cassino'}
             </Title>
             <Text c="dimmed" size="lg">
-              {property.guests_capacity} hospedes · {property.bedrooms} quarto(s) · {property.bathrooms} banheiro(s)
+              {property.guests_capacity} hospedes - {property.bedrooms} quarto(s) - {property.bathrooms} banheiro(s)
             </Text>
           </section>
 
           <Card withBorder radius="xl" p="md" className="detail-preference-card">
-            <Group justify="space-between" wrap="nowrap">
+            <Group justify="space-between" wrap="wrap" className="detail-preference-row">
               <Group gap={10}>
                 <Badge radius="xl" color="yellow" variant="light">
                   Preferido dos hospedes
@@ -555,7 +555,7 @@ export function PropertyDetailPage() {
 
               <form onSubmit={onCreateBooking}>
                 <Stack gap="sm">
-                  <Group grow>
+                  <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
                     <TextInput
                       label="Check-in"
                       type="date"
@@ -570,7 +570,7 @@ export function PropertyDetailPage() {
                       onChange={(event) => setCheckOutDate(event.currentTarget.value)}
                       required
                     />
-                  </Group>
+                  </SimpleGrid>
 
                   <NumberInput
                     label="Hospedes"

@@ -213,7 +213,7 @@ export function BookingsPage() {
 
                   return (
                     <Card key={booking.id} withBorder radius="lg" p="md" className="booking-card">
-                      <Group wrap="nowrap" className="booking-card-row">
+                      <Group wrap="wrap" className="booking-card-row">
                         <div className="booking-card-cover-wrap">
                           <img
                             src={bookingCoversByPropertyId[booking.property_id] || '/background.png'}
@@ -318,7 +318,7 @@ export function BookingsPage() {
                   const meta = bookingStatusMeta[normalizedStatus];
                   return (
                     <Card key={booking.id} withBorder radius="lg" p="md" className="booking-card">
-                      <Group wrap="nowrap" className="booking-card-row">
+                      <Group wrap="wrap" className="booking-card-row">
                         <div className="booking-card-cover-wrap">
                           <img
                             src={bookingCoversByPropertyId[booking.property_id] || '/background.png'}
