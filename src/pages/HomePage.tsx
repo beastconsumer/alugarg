@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Card, Group, Popover, Stack, Text, TextInput, Title, UnstyledButton } from '@mantine/core';
+import { Badge, Button, Card, Group, Popover, Stack, Text, TextInput, Title, UnstyledButton } from '@mantine/core';
 import { DatePicker, type DatesRangeValue } from '@mantine/dates';
 import { useMediaQuery } from '@mantine/hooks';
 import { format } from 'date-fns';
@@ -167,18 +167,32 @@ export function HomePage() {
   }, []);
 
   const totalGuests = guests.adults + guests.children;
+  const totalPeople = totalGuests + guests.babies;
 
   const whoLabel = useMemo(() => {
-    if (totalGuests <= 0 && guests.pets <= 0) return 'Quem vai?';
-    if (totalGuests > 0 && guests.pets > 0) return `${totalGuests} hospedes + ${guests.pets} pet`;
-    if (totalGuests > 0) return `${totalGuests} hospedes`;
+    if (totalPeople <= 0 && guests.pets <= 0) return 'Quem vai?';
+    if (totalPeople > 0 && guests.pets > 0) return `${totalPeople} hospedes + ${guests.pets} pet`;
+    if (totalPeople > 0) return `${totalPeople} hospedes`;
     return `${guests.pets} pet`;
-  }, [guests.pets, totalGuests]);
+  }, [guests.pets, totalPeople]);
 
   const whereLabel = useMemo(() => {
     if (useNearbyMode) return 'Perto de voce';
     return search || 'Para onde voce quer ir?';
   }, [search, useNearbyMode]);
+
+  const hasDateFilter = Boolean(dateRange[0] || dateRange[1]);
+  const hasDestinationFilter = useNearbyMode || search.trim().length > 0;
+  const hasGuestFilter = totalPeople > 0 || guests.pets > 0;
+  const hasActiveFilters = hasDateFilter || hasDestinationFilter || hasGuestFilter;
+
+  const activeFilterPills = useMemo(() => {
+    const pills: string[] = [];
+    if (hasDestinationFilter) pills.push(whereLabel);
+    if (hasDateFilter) pills.push(formatDateRange(dateRange));
+    if (hasGuestFilter) pills.push(whoLabel);
+    return pills;
+  }, [dateRange, hasDateFilter, hasDestinationFilter, hasGuestFilter, whereLabel, whoLabel]);
 
   const updateGuest = (key: keyof GuestState, delta: number) => {
     setGuests((current) => {
@@ -231,6 +245,20 @@ export function HomePage() {
     const value = destinationInput.trim();
     setSearch(value);
     setSearchMenuOpen(false);
+  };
+
+  const clearSearchFilters = () => {
+    setSearch('');
+    setDestinationInput('');
+    setDateRange([null, null]);
+    setGuests({
+      adults: 0,
+      children: 0,
+      babies: 0,
+      pets: 0,
+    });
+    setUseNearbyMode(false);
+    setMyCoords(null);
   };
 
   const filteredProperties = useMemo(() => {
@@ -325,8 +353,33 @@ export function HomePage() {
 
           <Popover.Dropdown className="home-discovery-panel">
             <Stack gap="md">
-              <Stack gap={8}>
-                <Text fw={700}>Onde</Text>
+              <Group justify="space-between" align="center" wrap="wrap" className="home-discovery-summary">
+                <Text fw={700}>Ajuste sua pesquisa</Text>
+                <Button
+                  variant="subtle"
+                  size="compact-sm"
+                  onClick={clearSearchFilters}
+                  disabled={!hasActiveFilters}
+                  className="home-discovery-reset"
+                >
+                  Limpar filtros
+                </Button>
+              </Group>
+
+              {activeFilterPills.length > 0 ? (
+                <Group gap={6} wrap="wrap">
+                  {activeFilterPills.map((item) => (
+                    <Badge key={item} variant="light" color="ocean" radius="xl">
+                      {item}
+                    </Badge>
+                  ))}
+                </Group>
+              ) : null}
+
+              <Stack gap={8} className="home-discovery-section">
+                <Text fw={700} className="home-discovery-label">
+                  Onde
+                </Text>
                 <TextInput
                   placeholder="Pesquise cidade, bairro ou regiao"
                   value={destinationInput}
@@ -383,8 +436,10 @@ export function HomePage() {
                 ) : null}
               </Stack>
 
-              <Stack gap={8}>
-                <Text fw={700}>Quando</Text>
+              <Stack gap={8} className="home-discovery-section home-discovery-date">
+                <Text fw={700} className="home-discovery-label">
+                  Quando
+                </Text>
                 <DatePicker
                   type="range"
                   numberOfColumns={isMobile ? 1 : 2}
@@ -395,8 +450,10 @@ export function HomePage() {
                 />
               </Stack>
 
-              <Stack gap={8}>
-                <Text fw={700}>Quem</Text>
+              <Stack gap={8} className="home-discovery-section">
+                <Text fw={700} className="home-discovery-label">
+                  Quem
+                </Text>
 
                 <div className="home-guest-row">
                   <div>
@@ -406,11 +463,17 @@ export function HomePage() {
                     </Text>
                   </div>
                   <Group gap={8}>
-                    <button type="button" className="home-guest-btn" onClick={() => updateGuest('adults', -1)}>
+                    <button
+                      type="button"
+                      className="home-guest-btn"
+                      onClick={() => updateGuest('adults', -1)}
+                      disabled={guests.adults === 0}
+                      aria-label="Diminuir adultos"
+                    >
                       <Minus size={14} />
                     </button>
                     <Text fw={700}>{guests.adults}</Text>
-                    <button type="button" className="home-guest-btn" onClick={() => updateGuest('adults', 1)}>
+                    <button type="button" className="home-guest-btn" onClick={() => updateGuest('adults', 1)} aria-label="Aumentar adultos">
                       <Plus size={14} />
                     </button>
                   </Group>
@@ -424,11 +487,22 @@ export function HomePage() {
                     </Text>
                   </div>
                   <Group gap={8}>
-                    <button type="button" className="home-guest-btn" onClick={() => updateGuest('children', -1)}>
+                    <button
+                      type="button"
+                      className="home-guest-btn"
+                      onClick={() => updateGuest('children', -1)}
+                      disabled={guests.children === 0}
+                      aria-label="Diminuir criancas"
+                    >
                       <Minus size={14} />
                     </button>
                     <Text fw={700}>{guests.children}</Text>
-                    <button type="button" className="home-guest-btn" onClick={() => updateGuest('children', 1)}>
+                    <button
+                      type="button"
+                      className="home-guest-btn"
+                      onClick={() => updateGuest('children', 1)}
+                      aria-label="Aumentar criancas"
+                    >
                       <Plus size={14} />
                     </button>
                   </Group>
@@ -442,11 +516,17 @@ export function HomePage() {
                     </Text>
                   </div>
                   <Group gap={8}>
-                    <button type="button" className="home-guest-btn" onClick={() => updateGuest('babies', -1)}>
+                    <button
+                      type="button"
+                      className="home-guest-btn"
+                      onClick={() => updateGuest('babies', -1)}
+                      disabled={guests.babies === 0}
+                      aria-label="Diminuir bebes"
+                    >
                       <Minus size={14} />
                     </button>
                     <Text fw={700}>{guests.babies}</Text>
-                    <button type="button" className="home-guest-btn" onClick={() => updateGuest('babies', 1)}>
+                    <button type="button" className="home-guest-btn" onClick={() => updateGuest('babies', 1)} aria-label="Aumentar bebes">
                       <Plus size={14} />
                     </button>
                   </Group>
@@ -460,20 +540,31 @@ export function HomePage() {
                     </Text>
                   </div>
                   <Group gap={8}>
-                    <button type="button" className="home-guest-btn" onClick={() => updateGuest('pets', -1)}>
+                    <button
+                      type="button"
+                      className="home-guest-btn"
+                      onClick={() => updateGuest('pets', -1)}
+                      disabled={guests.pets === 0}
+                      aria-label="Diminuir pets"
+                    >
                       <Minus size={14} />
                     </button>
                     <Text fw={700}>{guests.pets}</Text>
-                    <button type="button" className="home-guest-btn" onClick={() => updateGuest('pets', 1)}>
+                    <button type="button" className="home-guest-btn" onClick={() => updateGuest('pets', 1)} aria-label="Aumentar pets">
                       <Plus size={14} />
                     </button>
                   </Group>
                 </div>
               </Stack>
 
-              <Button radius="xl" leftSection={<Search size={16} />} className="home-discovery-submit" onClick={applySearch}>
-                Buscar
-              </Button>
+              <div className="home-discovery-actions">
+                <Button radius="xl" variant="default" className="home-discovery-clear" onClick={clearSearchFilters} disabled={!hasActiveFilters}>
+                  Limpar
+                </Button>
+                <Button radius="xl" leftSection={<Search size={16} />} className="home-discovery-submit" onClick={applySearch}>
+                  Buscar
+                </Button>
+              </div>
             </Stack>
           </Popover.Dropdown>
         </Popover>

@@ -852,6 +852,54 @@ canvas {
   background: #ffffff;
   max-height: min(72vh, 660px);
   overflow: auto;
+  padding: 6px;
+}
+
+.home-discovery-summary {
+  gap: 6px;
+}
+
+.home-discovery-reset {
+  color: #1f5ed6;
+  font-weight: 700;
+}
+
+.home-discovery-section {
+  border: 1px solid #dde6f4;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ffffff, #f8fbff);
+  padding: 12px;
+}
+
+.home-discovery-label {
+  letter-spacing: -0.15px;
+}
+
+.home-discovery-panel :where(.mantine-Input-input):focus {
+  border-color: #1f5ed6;
+  box-shadow: 0 0 0 3px rgba(31, 94, 214, 0.16);
+}
+
+.home-discovery-date :where(.mantine-DatePicker-day[data-selected]) {
+  background: #1f5ed6;
+  color: #ffffff;
+}
+
+.home-discovery-date :where(.mantine-DatePicker-day[data-in-range]) {
+  background: #e7efff;
+  color: #1f3f84;
+}
+
+.home-discovery-actions {
+  display: grid;
+  grid-template-columns: minmax(120px, auto) minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.home-discovery-clear {
+  border-color: #cfdcf1 !important;
+  color: #1f5ed6 !important;
 }
 
 .home-nearby-grid {
@@ -878,6 +926,11 @@ canvas {
   border-color: #bfd1ec;
   background: #f2f7ff;
   transform: translateY(-1px);
+}
+
+.home-nearby-btn:focus-visible {
+  outline: 2px solid #1f5ed6;
+  outline-offset: 2px;
 }
 
 .home-nearby-btn.active {
@@ -924,6 +977,7 @@ canvas {
 }
 
 .home-discovery-submit {
+  min-height: 44px;
   background: linear-gradient(135deg, #1f5ed6, #2d6eea) !important;
   box-shadow: 0 10px 18px rgba(31, 94, 214, 0.24);
 }
@@ -1085,8 +1139,8 @@ canvas {
 }
 
 .home-air-search-btn {
-  background: linear-gradient(135deg, #ff2f67, #ff385c) !important;
-  box-shadow: 0 10px 18px rgba(255, 56, 92, 0.3);
+  background: linear-gradient(135deg, #1f5ed6, #2d6eea) !important;
+  box-shadow: 0 10px 18px rgba(31, 94, 214, 0.24);
 }
 
 .home-air-search-submit {
@@ -1529,6 +1583,24 @@ canvas {
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease, color 120ms ease;
+}
+
+.home-guest-btn:hover {
+  border-color: #1f5ed6;
+  background: #eff4ff;
+}
+
+.home-guest-btn:focus-visible {
+  outline: 2px solid #1f5ed6;
+  outline-offset: 2px;
+}
+
+.home-guest-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  background: #f3f4f6;
+  border-color: #d1d5db;
 }
 
 .draft-photo {
@@ -2274,6 +2346,15 @@ canvas {
 
   .home-discovery-panel {
     max-height: min(76vh, 620px);
+    padding: 4px;
+  }
+
+  .home-discovery-section {
+    padding: 10px;
+  }
+
+  .home-discovery-actions {
+    grid-template-columns: 1fr;
   }
 
   .home-nearby-grid {
