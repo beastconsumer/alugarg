@@ -65,7 +65,7 @@ jobs:
       - name: Prepare Release Asset
         run: |
           mkdir -p release-assets
-          cp android/app/build/outputs/apk/release/app-release.apk "release-assets/aluga-aluga-${GITHUB_REF_NAME}.apk"
+          cp android/app/build/outputs/apk/release/app-release.apk "release-assets/AlugaSul-${GITHUB_REF_NAME}.apk"
 
       - name: Create GitHub Release + Upload APK
         uses: softprops/action-gh-release@v2

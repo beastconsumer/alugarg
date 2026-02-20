@@ -71,7 +71,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p release-assets
-          cp android/app/build/outputs/apk/release/app-release.apk release-assets/aluga-aluga-nightly.apk
+          cp android/app/build/outputs/apk/release/app-release.apk release-assets/AlugaSul-nightly.apk
 
       - name: Publish Nightly Release
         uses: ncipollo/release-action@v1
@@ -81,5 +81,4 @@ jobs:
           prerelease: true
           allowUpdates: true
           replacesArtifacts: true
-          artifacts: "release-assets/aluga-aluga-nightly.apk"
-
+          artifacts: "release-assets/AlugaSul-nightly.apk"
