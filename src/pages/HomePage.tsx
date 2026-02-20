@@ -1,16 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
 import { Button, Card, Group, Popover, Stack, Text, TextInput, Title, UnstyledButton } from '@mantine/core';
 import { DatePicker, type DatesRangeValue } from '@mantine/dates';
 import { useMediaQuery } from '@mantine/hooks';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CalendarDays, LocateFixed, Minus, Plus, Search, Users } from 'lucide-react';
-import UseAnimations from 'react-useanimations';
-import checkmarkAnimated from 'react-useanimations/lib/checkmark';
-import homeAnimated from 'react-useanimations/lib/home';
-import starAnimated from 'react-useanimations/lib/star';
-import userPlusAnimated from 'react-useanimations/lib/userPlus';
+import {
+  Building2,
+  CalendarDays,
+  Compass,
+  LocateFixed,
+  MapPinned,
+  Minus,
+  Plus,
+  Search,
+  Users,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { PropertyCard } from '../components/PropertyCard';
 import { seedProperties } from '../lib/seedProperties';
 import { supabase } from '../lib/supabase';
@@ -28,42 +33,37 @@ type NearbyOption = {
   label: string;
   hint: string;
   value: string;
-  animation: typeof homeAnimated;
-  color: string;
+  icon: LucideIcon;
 };
 
 const nearbyOptions: NearbyOption[] = [
   {
     key: 'nearby',
     label: 'Perto de voce',
-    hint: 'Busca inteligente por localizacao',
+    hint: 'Busca por localizacao atual',
     value: 'Perto de voce',
-    animation: homeAnimated,
-    color: '#1f5ed6',
+    icon: LocateFixed,
   },
   {
     key: 'cassino',
     label: 'Cassino',
     hint: 'Rio Grande - RS',
     value: 'Cassino, Rio Grande do Sul',
-    animation: starAnimated,
-    color: '#1e40af',
+    icon: MapPinned,
   },
   {
     key: 'riogrande',
     label: 'Rio Grande',
     hint: 'Centro e bairros proximos',
     value: 'Rio Grande, Rio Grande do Sul',
-    animation: checkmarkAnimated,
-    color: '#0f766e',
+    icon: Building2,
   },
   {
     key: 'pelotas',
     label: 'Pelotas',
     hint: 'Opcao proxima ao Cassino',
     value: 'Pelotas, Rio Grande do Sul',
-    animation: userPlusAnimated,
-    color: '#b45309',
+    icon: Compass,
   },
 ];
 
@@ -242,10 +242,7 @@ export function HomePage() {
       if (useNearbyMode) return true;
       if (!normalizedSearch) return true;
 
-      const searchable = [property.title, property.description, property.location.addressText]
-        .join(' ')
-        .toLowerCase();
-
+      const searchable = [property.title, property.description, property.location.addressText].join(' ').toLowerCase();
       return searchable.includes(normalizedSearch);
     });
   }, [allProperties, guests.pets, search, totalGuests, useNearbyMode]);
@@ -266,7 +263,6 @@ export function HomePage() {
 
     const withDistanceIds = new Set(withDistance.map((property) => property.id));
     const withoutDistance = filteredProperties.filter((property) => !withDistanceIds.has(property.id));
-
     return [...withDistance, ...withoutDistance];
   }, [filteredProperties, myCoords, useNearbyMode]);
 
@@ -287,7 +283,7 @@ export function HomePage() {
 
   return (
     <Stack gap="lg" py="md">
-      <Card radius="xl" withBorder p={isMobile ? 'md' : 'lg'} className="home-discovery-shell">
+      <Card radius="xl" withBorder p={isMobile ? 'sm' : 'lg'} className="home-discovery-shell">
         <Popover
           opened={searchMenuOpen}
           onChange={setSearchMenuOpen}
@@ -299,33 +295,31 @@ export function HomePage() {
           withinPortal
         >
           <Popover.Target>
-            <motion.div whileHover={{ y: -1 }} whileTap={{ scale: 0.995 }}>
-              <UnstyledButton
-                className="home-discovery-trigger"
-                onClick={() => {
-                  setDestinationInput((current) => current || search);
-                  setSearchMenuOpen(true);
-                }}
-              >
-                <div className="home-discovery-trigger-main">
-                  <Text fw={700}>Pesquisar</Text>
-                  <Text className="home-discovery-trigger-sub">{whereLabel}</Text>
-                </div>
+            <UnstyledButton
+              className="home-discovery-trigger"
+              onClick={() => {
+                setDestinationInput((current) => current || search);
+                setSearchMenuOpen(true);
+              }}
+            >
+              <div className="home-discovery-trigger-main">
+                <Text fw={700}>Pesquisar</Text>
+                <Text className="home-discovery-trigger-sub">{whereLabel}</Text>
+              </div>
 
-                <div className="home-discovery-trigger-meta">
-                  <span>
-                    <CalendarDays size={13} /> {formatDateRange(dateRange)}
-                  </span>
-                  <span>
-                    <Users size={13} /> {whoLabel}
-                  </span>
-                </div>
-
-                <span className="home-discovery-trigger-search" aria-hidden>
-                  <Search size={16} />
+              <div className="home-discovery-trigger-meta">
+                <span>
+                  <CalendarDays size={13} /> {formatDateRange(dateRange)}
                 </span>
-              </UnstyledButton>
-            </motion.div>
+                <span>
+                  <Users size={13} /> {whoLabel}
+                </span>
+              </div>
+
+              <span className="home-discovery-trigger-search" aria-hidden>
+                <Search size={16} />
+              </span>
+            </UnstyledButton>
           </Popover.Target>
 
           <Popover.Dropdown className="home-discovery-panel">
@@ -348,24 +342,28 @@ export function HomePage() {
                 />
 
                 <Group gap="xs" wrap="wrap" className="home-nearby-grid">
-                  {nearbyOptions.map((option) => (
-                    <button
-                      key={option.key}
-                      type="button"
-                      className={`home-nearby-btn ${useNearbyMode && option.key === 'nearby' ? 'active' : ''}`}
-                      onClick={() => {
-                        void selectNearby(option);
-                      }}
-                    >
-                      <span className="home-nearby-btn-icon">
-                        <UseAnimations animation={option.animation} size={16} strokeColor={option.color} autoplay loop speed={0.85} />
-                      </span>
-                      <span className="home-nearby-btn-copy">
-                        <strong>{option.label}</strong>
-                        <small>{option.hint}</small>
-                      </span>
-                    </button>
-                  ))}
+                  {nearbyOptions.map((option) => {
+                    const Icon = option.icon;
+
+                    return (
+                      <button
+                        key={option.key}
+                        type="button"
+                        className={`home-nearby-btn ${useNearbyMode && option.key === 'nearby' ? 'active' : ''}`}
+                        onClick={() => {
+                          void selectNearby(option);
+                        }}
+                      >
+                        <span className="home-nearby-btn-icon">
+                          <Icon size={16} />
+                        </span>
+                        <span className="home-nearby-btn-copy">
+                          <strong>{option.label}</strong>
+                          <small>{option.hint}</small>
+                        </span>
+                      </button>
+                    );
+                  })}
                 </Group>
 
                 {locating ? (
@@ -485,10 +483,12 @@ export function HomePage() {
 
       {!loading && !errorMessage ? (
         sortedProperties.length > 0 ? (
-          <Stack gap="xl">
+          <Stack gap="lg">
             <section className="home-carousel-section">
               <Group gap={8} align="center" className="home-section-title-row">
-                <UseAnimations animation={starAnimated} size={18} strokeColor="#1f5ed6" autoplay loop speed={0.75} />
+                <span className="home-section-icon" aria-hidden>
+                  <MapPinned size={16} />
+                </span>
                 <Title order={3}>Acomodacoes em Balneario Cassino</Title>
               </Group>
               <Text size="sm" c="dimmed" className="home-section-subtitle">
@@ -503,7 +503,9 @@ export function HomePage() {
 
             <section className="home-carousel-section">
               <Group gap={8} align="center" className="home-section-title-row">
-                <UseAnimations animation={starAnimated} size={18} strokeColor="#1f5ed6" autoplay loop speed={0.75} />
+                <span className="home-section-icon" aria-hidden>
+                  <Building2 size={16} />
+                </span>
                 <Title order={3}>Acomodacoes muito procuradas em Rio Grande</Title>
               </Group>
               <Text size="sm" c="dimmed" className="home-section-subtitle">

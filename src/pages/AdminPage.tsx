@@ -16,6 +16,7 @@ import {
   TextInput,
   Title,
 } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { CheckCircle2, Clock3, MessageSquare, RefreshCw, ShieldCheck, ShieldUser, XCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { normalizePhone } from '../lib/phone';
@@ -63,6 +64,8 @@ const hostStatusMeta: Record<
 };
 
 export function AdminPage() {
+  const isMobile = useMediaQuery('(max-width: 900px)');
+
   const [ready, setReady] = useState(false);
   const [sessionUserId, setSessionUserId] = useState('');
   const [currentProfile, setCurrentProfile] = useState<UserProfile | null>(null);
@@ -83,6 +86,7 @@ export function AdminPage() {
   const [messagesByConversation, setMessagesByConversation] = useState<Record<string, ChatMessage[]>>({});
   const [selectedConversationId, setSelectedConversationId] = useState('');
   const [adminMessage, setAdminMessage] = useState('');
+  const [chatFilter, setChatFilter] = useState<'all' | 'open' | 'closed' | 'blocked'>('open');
 
   const [usersById, setUsersById] = useState<Record<string, UserProfile>>({});
   const [hostUsers, setHostUsers] = useState<UserProfile[]>([]);
@@ -114,6 +118,11 @@ export function AdminPage() {
     () => messagesByConversation[selectedConversationId] ?? [],
     [messagesByConversation, selectedConversationId],
   );
+
+  const filteredConversations = useMemo(() => {
+    if (chatFilter === 'all') return conversations;
+    return conversations.filter((item) => item.status === chatFilter);
+  }, [chatFilter, conversations]);
 
   const propertyItems = useMemo<AdminPropertyItem[]>(() => {
     return properties.map((property) => ({
@@ -162,6 +171,24 @@ export function AdminPage() {
     if (hostFilter === 'all') return hostUsers;
     return hostUsers.filter((item) => item.host_verification_status === hostFilter);
   }, [hostFilter, hostUsers]);
+
+  const hostFilterOptions = useMemo(
+    () =>
+      isMobile
+        ? [
+            { label: `Pend (${summary.hostsSummary.pending})`, value: 'pending' },
+            { label: `Verif (${summary.hostsSummary.verified})`, value: 'verified' },
+            { label: `Rej (${summary.hostsSummary.rejected})`, value: 'rejected' },
+            { label: 'Todos', value: 'all' },
+          ]
+        : [
+            { label: `Pendentes (${summary.hostsSummary.pending})`, value: 'pending' },
+            { label: `Verificados (${summary.hostsSummary.verified})`, value: 'verified' },
+            { label: `Rejeitados (${summary.hostsSummary.rejected})`, value: 'rejected' },
+            { label: 'Todos', value: 'all' },
+          ],
+    [isMobile, summary.hostsSummary.pending, summary.hostsSummary.verified, summary.hostsSummary.rejected],
+  );
 
   const loadConversationMessages = async (conversationId: string) => {
     const { data, error } = await supabase
@@ -609,8 +636,8 @@ export function AdminPage() {
   }
 
   return (
-    <Stack gap="md" p="md" maw={1280} mx="auto" className="admin-bg">
-      <Card withBorder radius="xl" p="lg" className="admin-glass">
+    <Stack gap="md" p={isMobile ? 'xs' : 'md'} maw={1280} mx="auto" className="admin-bg">
+      <Card withBorder radius="xl" p={isMobile ? 'md' : 'lg'} className="admin-glass">
         <Group justify="space-between" align="flex-start" wrap="wrap">
           <Stack gap={4}>
             <Title order={2} className="admin-title">
@@ -624,23 +651,24 @@ export function AdminPage() {
             </Text>
           </Stack>
 
-          <Group>
+          <Group wrap="wrap">
             <Button
               variant="default"
               leftSection={<RefreshCw size={16} />}
               loading={loadingData}
               onClick={() => void loadDashboardData()}
+              fullWidth={isMobile}
             >
               Atualizar
             </Button>
-            <Button color="red" variant="light" onClick={() => void clearSession()}>
+            <Button color="red" variant="light" onClick={() => void clearSession()} fullWidth={isMobile}>
               Sair
             </Button>
           </Group>
         </Group>
       </Card>
 
-      <SimpleGrid cols={{ base: 2, sm: 5 }} spacing="sm">
+      <SimpleGrid cols={{ base: 1, xs: 2, md: 5 }} spacing="sm">
         <Card withBorder radius="xl" p="md" className="admin-kpi">
           <Text c="dimmed" size="sm" className="admin-muted">
             Anuncios pendentes
@@ -695,7 +723,7 @@ export function AdminPage() {
           <Tabs.Tab value="properties">Anuncios</Tabs.Tab>
           <Tabs.Tab value="bookings">Reservas</Tabs.Tab>
           <Tabs.Tab value="hosts">Anfitrioes</Tabs.Tab>
-          <Tabs.Tab value="chats">Chats</Tabs.Tab>
+          <Tabs.Tab value="chats">Suporte</Tabs.Tab>
         </Tabs.List>
 
         <Tabs.Panel value="properties" pt="md">
@@ -885,12 +913,7 @@ export function AdminPage() {
               <SegmentedControl
                 value={hostFilter}
                 onChange={(value) => setHostFilter(value as 'all' | 'pending' | 'verified' | 'rejected')}
-                data={[
-                  { label: `Pendentes (${summary.hostsSummary.pending})`, value: 'pending' },
-                  { label: `Verificados (${summary.hostsSummary.verified})`, value: 'verified' },
-                  { label: `Rejeitados (${summary.hostsSummary.rejected})`, value: 'rejected' },
-                  { label: 'Todos', value: 'all' },
-                ]}
+                data={hostFilterOptions}
               />
             </Group>
 
@@ -1032,15 +1055,53 @@ export function AdminPage() {
         </Tabs.Panel>
 
         <Tabs.Panel value="chats" pt="md">
+          <Card withBorder radius="xl" p="md" className="admin-entity-card">
+            <Stack gap="sm">
+              <Group justify="space-between" align="flex-start" wrap="wrap">
+                <Stack gap={2}>
+                  <Title order={4} className="admin-title">
+                    Central de suporte e chat
+                  </Title>
+                  <Text size="sm" c="dimmed" className="admin-muted">
+                    Atenda usuarios por conversa de reserva, atualize status e registre avisos oficiais.
+                  </Text>
+                </Stack>
+
+                <SegmentedControl
+                  value={chatFilter}
+                  onChange={(value) => setChatFilter(value as 'all' | 'open' | 'closed' | 'blocked')}
+                  data={[
+                    { label: `Abertos (${summary.chatsSummary.open})`, value: 'open' },
+                    { label: `Encerrados (${summary.chatsSummary.closed})`, value: 'closed' },
+                    { label: `Bloqueados (${summary.chatsSummary.blocked})`, value: 'blocked' },
+                    { label: `Todos (${conversations.length})`, value: 'all' },
+                  ]}
+                />
+              </Group>
+
+              <Group gap="xs" wrap="wrap" className="admin-support-highlight">
+                <Badge color="teal" variant="light">
+                  Abertos: {summary.chatsSummary.open}
+                </Badge>
+                <Badge color="gray" variant="light">
+                  Encerrados: {summary.chatsSummary.closed}
+                </Badge>
+                <Badge color="red" variant="light">
+                  Bloqueados: {summary.chatsSummary.blocked}
+                </Badge>
+              </Group>
+            </Stack>
+          </Card>
+
           <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="md">
             <Card withBorder radius="xl" p="md" className="admin-entity-card">
               <Stack gap="sm">
                 <Title order={4} className="admin-title">
-                  Conversas
+                  Conversas filtradas
                 </Title>
-                <ScrollArea h={520}>
+                <ScrollArea h={isMobile ? 360 : 520}>
                   <Stack gap="xs">
-                    {conversations.map((conversation) => {
+                    {filteredConversations.map((conversation) => {
                       const booking = bookingById[conversation.booking_id];
                       const property = propertyById[conversation.property_id];
                       const renter = usersById[conversation.renter_id];
@@ -1070,6 +1131,9 @@ export function AdminPage() {
                             <Text size="xs" c="dimmed" className="admin-muted">
                               Atualizado: {formatDate(conversation.last_message_at)}
                             </Text>
+                            <Text size="xs" c="dimmed" className="admin-muted">
+                              Reserva status: {booking?.status || '-'}
+                            </Text>
                             <Button size="xs" variant="default" onClick={() => setSelectedConversationId(conversation.id)}>
                               Visualizar
                             </Button>
@@ -1077,9 +1141,9 @@ export function AdminPage() {
                         </Card>
                       );
                     })}
-                    {conversations.length === 0 ? (
+                    {filteredConversations.length === 0 ? (
                       <Text c="dimmed" className="admin-muted">
-                        Nenhum chat criado.
+                        Nenhuma conversa para o filtro selecionado.
                       </Text>
                     ) : null}
                   </Stack>
@@ -1112,7 +1176,7 @@ export function AdminPage() {
                   </Group>
                 ) : null}
 
-                <ScrollArea h={420}>
+                <ScrollArea h={isMobile ? 320 : 420}>
                   <Stack gap="xs">
                     {selectedMessages.map((message) => {
                       const sender = usersById[message.sender_id];

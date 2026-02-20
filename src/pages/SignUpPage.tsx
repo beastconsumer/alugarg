@@ -99,8 +99,7 @@ export function SignUpPage() {
       navigate('/login', {
         replace: true,
         state: {
-          notice:
-            'Conta criada. Se seu projeto exige confirmacao de email, confirme e depois faca login.',
+          notice: 'Conta criada. Se seu projeto exige confirmacao de email, confirme e depois faca login.',
         },
       });
     } catch (error) {
@@ -111,14 +110,16 @@ export function SignUpPage() {
   };
 
   return (
-    <Box className="auth-screen-shell">
-      <Container size="sm" py={40}>
-        <Paper withBorder radius="xl" shadow="lg" p="xl">
+    <Box className="auth-clean-shell">
+      <Container size="sm" className="auth-clean-container">
+        <Paper withBorder radius="xl" p="xl" className="auth-clean-card">
           <Stack gap="lg">
             <Stack gap={4}>
-              <Title order={2}>Criar conta</Title>
+              <Title order={2} className="auth-clean-title">
+                Criar conta
+              </Title>
               <Text c="dimmed" size="sm">
-                Cadastro completo para reservas e anuncios com seguranca.
+                Cadastro simples para reservar, anunciar e conversar com seguranca.
               </Text>
             </Stack>
 
@@ -200,14 +201,7 @@ export function SignUpPage() {
                   </Alert>
                 ) : null}
 
-                <Button
-                  type="submit"
-                  loading={loading}
-                  leftSection={<UserPlus size={16} />}
-                  variant="gradient"
-                  gradient={{ from: 'ocean.6', to: 'ocean.4', deg: 120 }}
-                  fullWidth
-                >
+                <Button type="submit" loading={loading} leftSection={<UserPlus size={16} />} fullWidth>
                   Criar conta
                 </Button>
               </Stack>

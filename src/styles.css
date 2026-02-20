@@ -403,6 +403,46 @@ canvas {
   background: rgba(15, 23, 42, 0.02); 
   border-color: rgba(100, 116, 139, 0.75); 
 } 
+
+.auth-clean-shell {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(26px + env(safe-area-inset-top, 0px)) calc(16px + env(safe-area-inset-right, 0px))
+    calc(26px + env(safe-area-inset-bottom, 0px)) calc(16px + env(safe-area-inset-left, 0px));
+  background: linear-gradient(180deg, #f7f9fd 0%, #f2f5fb 100%);
+  font-family: 'Manrope', 'Segoe UI', system-ui, sans-serif;
+}
+
+.auth-clean-container {
+  width: 100%;
+}
+
+.auth-clean-card {
+  border-color: #d7e1f2 !important;
+  background: #ffffff !important;
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.1);
+}
+
+.auth-clean-title {
+  letter-spacing: -0.3px;
+  color: #0f172a;
+}
+
+.auth-clean-card :where(.mantine-Input-label) {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.auth-clean-card :where(.mantine-Input-input) {
+  border-radius: 12px;
+  min-height: 46px;
+}
+
+.auth-clean-fine {
+  line-height: 1.35;
+}
  
 .auth-login-shell { 
   position: relative; 
@@ -786,12 +826,12 @@ canvas {
   width: 42px;
   height: 42px;
   border-radius: 999px;
-  background: linear-gradient(135deg, #ff385c, #ff4f7a);
+  background: linear-gradient(135deg, #1f5ed6, #3879f2);
   color: #ffffff;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 10px 20px rgba(255, 56, 92, 0.35);
+  box-shadow: 0 10px 20px rgba(31, 94, 214, 0.3);
 }
 
 .home-discovery-panel {
@@ -830,7 +870,7 @@ canvas {
 
 .home-nearby-btn.active {
   border-color: #1f5ed6;
-  background: #ebf2ff;
+  background: #f0f5ff;
 }
 
 .home-nearby-btn-icon {
@@ -842,6 +882,7 @@ canvas {
   justify-content: center;
   background: #ffffff;
   border: 1px solid #d6e2f3;
+  color: #1f5ed6;
 }
 
 .home-nearby-btn-copy {
@@ -863,16 +904,16 @@ canvas {
 
 .home-nearby-mode-pill {
   width: fit-content;
-  color: #1d4ed8;
+  color: #1f5ed6;
   border: 1px solid #cbdaf8;
-  background: #eef4ff;
+  background: #f4f7ff;
   border-radius: 999px;
   padding: 5px 10px;
 }
 
 .home-discovery-submit {
-  background: linear-gradient(135deg, #ff2f67, #ff385c) !important;
-  box-shadow: 0 10px 18px rgba(255, 56, 92, 0.26);
+  background: linear-gradient(135deg, #1f5ed6, #2d6eea) !important;
+  box-shadow: 0 10px 18px rgba(31, 94, 214, 0.24);
 }
 
 .home-air-tabs-row {
@@ -1177,6 +1218,19 @@ canvas {
 
 .home-section-title-row :where(.mantine-Title-root) {
   letter-spacing: -0.2px;
+  font-size: clamp(1.05rem, 0.95rem + 0.65vw, 1.35rem);
+}
+
+.home-section-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid #d8e2f3;
+  background: #f6f9ff;
+  color: #1f5ed6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .home-section-subtitle {
@@ -1606,6 +1660,25 @@ canvas {
   border-color: #cddcff;
 }
 
+.admin-support-highlight {
+  border: 1px solid #d8e2f3;
+  background: linear-gradient(180deg, #ffffff, #f8fbff);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.chat-conversation-list {
+  max-height: min(58vh, 520px);
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.chat-conversation-item {
+  min-height: 62px;
+  height: auto;
+  padding-inline: 10px;
+}
+
 .map-card {
   overflow: hidden;
 }
@@ -2019,6 +2092,11 @@ canvas {
     padding: calc(24px + env(safe-area-inset-top, 0px)) calc(14px + env(safe-area-inset-right, 0px))
       calc(24px + env(safe-area-inset-bottom, 0px)) calc(14px + env(safe-area-inset-left, 0px)); 
   } 
+
+  .auth-clean-shell {
+    padding: calc(20px + env(safe-area-inset-top, 0px)) calc(12px + env(safe-area-inset-right, 0px))
+      calc(20px + env(safe-area-inset-bottom, 0px)) calc(12px + env(safe-area-inset-left, 0px));
+  }
  
   .auth-entry-shell { 
     padding: calc(22px + env(safe-area-inset-top, 0px)) calc(14px + env(safe-area-inset-right, 0px))
@@ -2160,12 +2238,16 @@ canvas {
   .home-discovery-trigger {
     grid-template-columns: 1fr auto;
     border-radius: 18px;
-    min-height: 64px;
-    padding: 10px;
+    min-height: 58px;
+    padding: 8px 10px;
   }
 
   .home-discovery-trigger-meta {
     display: none;
+  }
+
+  .home-discovery-trigger-sub {
+    font-size: 0.93rem;
   }
 
   .home-discovery-panel {
@@ -2174,6 +2256,18 @@ canvas {
 
   .home-nearby-grid {
     grid-template-columns: 1fr;
+  }
+
+  .home-nearby-btn {
+    padding: 8px 10px;
+  }
+
+  .home-nearby-btn-copy strong {
+    font-size: 0.82rem;
+  }
+
+  .home-nearby-btn-copy small {
+    font-size: 0.74rem;
   }
 
   .home-listing-item {
