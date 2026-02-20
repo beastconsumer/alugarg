@@ -1,11 +1,11 @@
 import { Box, Container, Paper, Text, ThemeIcon, UnstyledButton } from '@mantine/core';
-import { CalendarDays, Home, MapPin, User } from 'lucide-react';
+import { Home, MapPin, MessageSquareText, User } from 'lucide-react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 
 const navItems = [
   { to: '/app/home', label: 'Home', icon: Home },
   { to: '/app/map', label: 'Mapa', icon: MapPin },
-  { to: '/app/bookings', label: 'Reservas', icon: CalendarDays },
+  { to: '/app/chat', label: 'Chat', icon: MessageSquareText },
   { to: '/app/profile', label: 'Perfil', icon: User },
 ];
 

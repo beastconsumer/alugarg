@@ -1,29 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import {
-  Button,
-  Card,
-  Group,
-  Popover,
-  Stack,
-  Text,
-  TextInput,
-  Title,
-  UnstyledButton,
-} from '@mantine/core';
+import { Button, Card, Group, Popover, Stack, Text, TextInput, Title, UnstyledButton } from '@mantine/core';
 import { DatePicker, type DatesRangeValue } from '@mantine/dates';
 import { useMediaQuery } from '@mantine/hooks';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Minus, Plus, Search } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { CalendarDays, LocateFixed, Minus, Plus, Search, Users } from 'lucide-react';
 import UseAnimations from 'react-useanimations';
+import checkmarkAnimated from 'react-useanimations/lib/checkmark';
 import homeAnimated from 'react-useanimations/lib/home';
+import starAnimated from 'react-useanimations/lib/star';
 import userPlusAnimated from 'react-useanimations/lib/userPlus';
 import { PropertyCard } from '../components/PropertyCard';
 import { seedProperties } from '../lib/seedProperties';
 import { supabase } from '../lib/supabase';
-import { parseProperty, Property, RentType } from '../lib/types';
+import { parseProperty, Property } from '../lib/types';
 
 type GuestState = {
   adults: number;
@@ -32,25 +23,53 @@ type GuestState = {
   pets: number;
 };
 
-const destinationSuggestions = [
-  'Cassino, Rio Grande do Sul',
-  'Rio Grande, Rio Grande do Sul',
-  'Pelotas, Rio Grande do Sul',
-  'Sao Lourenco do Sul, Rio Grande do Sul',
-  'Porto Alegre, Rio Grande do Sul',
-  'Gramado, Rio Grande do Sul',
-];
+type NearbyOption = {
+  key: string;
+  label: string;
+  hint: string;
+  value: string;
+  animation: typeof homeAnimated;
+  color: string;
+};
 
-const rentTypeToggleData: Array<{ value: '' | RentType; label: string }> = [
-  { value: '', label: 'Datas' },
-  { value: 'mensal', label: 'Mensal' },
-  { value: 'temporada', label: 'Temporada' },
-  { value: 'diaria', label: 'Diaria' },
+const nearbyOptions: NearbyOption[] = [
+  {
+    key: 'nearby',
+    label: 'Perto de voce',
+    hint: 'Busca inteligente por localizacao',
+    value: 'Perto de voce',
+    animation: homeAnimated,
+    color: '#1f5ed6',
+  },
+  {
+    key: 'cassino',
+    label: 'Cassino',
+    hint: 'Rio Grande - RS',
+    value: 'Cassino, Rio Grande do Sul',
+    animation: starAnimated,
+    color: '#1e40af',
+  },
+  {
+    key: 'riogrande',
+    label: 'Rio Grande',
+    hint: 'Centro e bairros proximos',
+    value: 'Rio Grande, Rio Grande do Sul',
+    animation: checkmarkAnimated,
+    color: '#0f766e',
+  },
+  {
+    key: 'pelotas',
+    label: 'Pelotas',
+    hint: 'Opcao proxima ao Cassino',
+    value: 'Pelotas, Rio Grande do Sul',
+    animation: userPlusAnimated,
+    color: '#b45309',
+  },
 ];
 
 const formatDateRange = (value: DatesRangeValue): string => {
   if (!value[0] && !value[1]) {
-    return 'Insira as datas';
+    return 'Escolha as datas';
   }
 
   if (value[0] && !value[1]) {
@@ -61,7 +80,20 @@ const formatDateRange = (value: DatesRangeValue): string => {
     return `${format(value[0], 'dd MMM', { locale: ptBR })} - ${format(value[1], 'dd MMM', { locale: ptBR })}`;
   }
 
-  return 'Insira as datas';
+  return 'Escolha as datas';
+};
+
+const distanceInKm = (aLat: number, aLng: number, bLat: number, bLng: number): number => {
+  const toRad = (value: number) => (value * Math.PI) / 180;
+  const radius = 6371;
+  const dLat = toRad(bLat - aLat);
+  const dLng = toRad(bLng - aLng);
+
+  const p =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+
+  return radius * (2 * Math.atan2(Math.sqrt(p), Math.sqrt(1 - p)));
 };
 
 export function HomePage() {
@@ -74,7 +106,6 @@ export function HomePage() {
   const [search, setSearch] = useState('');
   const [destinationInput, setDestinationInput] = useState('');
   const [dateRange, setDateRange] = useState<DatesRangeValue>([null, null]);
-  const [rentType, setRentType] = useState<'' | RentType>('');
   const [guests, setGuests] = useState<GuestState>({
     adults: 0,
     children: 0,
@@ -82,9 +113,10 @@ export function HomePage() {
     pets: 0,
   });
 
-  const [whereOpen, setWhereOpen] = useState(false);
-  const [whenOpen, setWhenOpen] = useState(false);
-  const [whoOpen, setWhoOpen] = useState(false);
+  const [searchMenuOpen, setSearchMenuOpen] = useState(false);
+  const [useNearbyMode, setUseNearbyMode] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [myCoords, setMyCoords] = useState<{ lat: number; lng: number } | null>(null);
 
   const loadApprovedProperties = async () => {
     setLoading(true);
@@ -136,58 +168,16 @@ export function HomePage() {
   const totalGuests = guests.adults + guests.children;
 
   const whoLabel = useMemo(() => {
-    if (totalGuests <= 0 && guests.pets <= 0) return 'Hospedes?';
+    if (totalGuests <= 0 && guests.pets <= 0) return 'Quem vai?';
     if (totalGuests > 0 && guests.pets > 0) return `${totalGuests} hospedes + ${guests.pets} pet`;
     if (totalGuests > 0) return `${totalGuests} hospedes`;
     return `${guests.pets} pet`;
   }, [guests.pets, totalGuests]);
 
-  const filteredProperties = useMemo(() => {
-    const normalizedSearch = search.trim().toLowerCase();
-
-    return allProperties.filter((property) => {
-      if (rentType && property.rent_type !== rentType) return false;
-      if (totalGuests > 0 && property.guests_capacity < totalGuests) return false;
-      if (guests.pets > 0 && !property.pet_friendly) return false;
-
-      if (!normalizedSearch) return true;
-
-      const searchable = [property.title, property.description, property.location.addressText]
-        .join(' ')
-        .toLowerCase();
-
-      return searchable.includes(normalizedSearch);
-    });
-  }, [allProperties, guests.pets, rentType, search, totalGuests]);
-
-  const rowOneProperties = useMemo(() => {
-    const filtered = filteredProperties.filter((property) =>
-      property.location.addressText.toLowerCase().includes('cassino'),
-    );
-    return (filtered.length > 0 ? filtered : filteredProperties).slice(0, 14);
-  }, [filteredProperties]);
-
-  const rowTwoProperties = useMemo(() => {
-    const rowOneIds = new Set(rowOneProperties.map((property) => property.id));
-    const remaining = filteredProperties.filter((property) => !rowOneIds.has(property.id));
-    const ranked = (remaining.length > 0 ? remaining : filteredProperties).slice().sort((a, b) => {
-      if (b.views_count !== a.views_count) return b.views_count - a.views_count;
-      return b.price - a.price;
-    });
-    return ranked.slice(0, 14);
-  }, [filteredProperties, rowOneProperties]);
-
-  const closeAllPanels = () => {
-    setWhereOpen(false);
-    setWhenOpen(false);
-    setWhoOpen(false);
-  };
-
-  const openPanel = (panel: 'where' | 'when' | 'who') => {
-    setWhereOpen(panel === 'where');
-    setWhenOpen(panel === 'when');
-    setWhoOpen(panel === 'who');
-  };
+  const whereLabel = useMemo(() => {
+    if (useNearbyMode) return 'Perto de voce';
+    return search || 'Para onde voce quer ir?';
+  }, [search, useNearbyMode]);
 
   const updateGuest = (key: keyof GuestState, delta: number) => {
     setGuests((current) => {
@@ -196,262 +186,314 @@ export function HomePage() {
     });
   };
 
-  const applyDestination = (value: string) => {
-    setSearch(value);
-    setDestinationInput(value);
-    setWhereOpen(false);
+  const selectNearby = async (option: NearbyOption) => {
+    if (option.key !== 'nearby') {
+      setUseNearbyMode(false);
+      setMyCoords(null);
+      setDestinationInput(option.value);
+      setSearch(option.value);
+      return;
+    }
+
+    setUseNearbyMode(true);
+    setDestinationInput(option.value);
+    setSearch('');
+
+    if (!navigator.geolocation) {
+      setMyCoords(null);
+      return;
+    }
+
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setMyCoords({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        });
+        setLocating(false);
+      },
+      () => {
+        setMyCoords(null);
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 7000 },
+    );
   };
+
+  const applySearch = () => {
+    if (useNearbyMode) {
+      setSearchMenuOpen(false);
+      return;
+    }
+
+    const value = destinationInput.trim();
+    setSearch(value);
+    setSearchMenuOpen(false);
+  };
+
+  const filteredProperties = useMemo(() => {
+    const normalizedSearch = search.trim().toLowerCase();
+
+    return allProperties.filter((property) => {
+      if (totalGuests > 0 && property.guests_capacity < totalGuests) return false;
+      if (guests.pets > 0 && !property.pet_friendly) return false;
+
+      if (useNearbyMode) return true;
+      if (!normalizedSearch) return true;
+
+      const searchable = [property.title, property.description, property.location.addressText]
+        .join(' ')
+        .toLowerCase();
+
+      return searchable.includes(normalizedSearch);
+    });
+  }, [allProperties, guests.pets, search, totalGuests, useNearbyMode]);
+
+  const sortedProperties = useMemo(() => {
+    if (!useNearbyMode || !myCoords) return filteredProperties;
+
+    const withDistance = filteredProperties
+      .filter((property) => typeof property.location.lat === 'number' && typeof property.location.lng === 'number')
+      .map((property) => ({
+        property,
+        distance: distanceInKm(myCoords.lat, myCoords.lng, property.location.lat as number, property.location.lng as number),
+      }))
+      .sort((a, b) => a.distance - b.distance)
+      .map((item) => item.property);
+
+    if (withDistance.length === 0) return filteredProperties;
+
+    const withDistanceIds = new Set(withDistance.map((property) => property.id));
+    const withoutDistance = filteredProperties.filter((property) => !withDistanceIds.has(property.id));
+
+    return [...withDistance, ...withoutDistance];
+  }, [filteredProperties, myCoords, useNearbyMode]);
+
+  const rowOneProperties = useMemo(() => {
+    const filtered = sortedProperties.filter((property) => property.location.addressText.toLowerCase().includes('cassino'));
+    return (filtered.length > 0 ? filtered : sortedProperties).slice(0, 14);
+  }, [sortedProperties]);
+
+  const rowTwoProperties = useMemo(() => {
+    const rowOneIds = new Set(rowOneProperties.map((property) => property.id));
+    const remaining = sortedProperties.filter((property) => !rowOneIds.has(property.id));
+    const ranked = (remaining.length > 0 ? remaining : sortedProperties).slice().sort((a, b) => {
+      if (b.views_count !== a.views_count) return b.views_count - a.views_count;
+      return b.price - a.price;
+    });
+    return ranked.slice(0, 14);
+  }, [rowOneProperties, sortedProperties]);
 
   return (
     <Stack gap="lg" py="md">
-      <Card radius="xl" withBorder p={isMobile ? 'md' : 'lg'} className="home-air-shell">
-        <Stack gap="lg">
-          <Group justify="space-between" align="center" gap="sm" wrap="nowrap" className="home-air-tabs-row">
-            <Group className="home-air-tabs" justify="center" gap="xl" wrap="nowrap">
-              <button type="button" className="home-air-tab active" aria-current="page">
-                <span className="home-air-tab-icon">
-                  <UseAnimations animation={homeAnimated} size={18} strokeColor="#1f5ed6" autoplay />
-                </span>
-                <span>Acomodacoes</span>
-              </button>
-            </Group>
-
-            <Button
-              component={Link}
-              to="/app/announce"
-              variant="default"
-              size={isMobile ? 'sm' : 'md'}
-              radius="xl"
-              className="home-air-host-btn"
-              leftSection={<UseAnimations animation={userPlusAnimated} size={18} strokeColor="#334155" autoplay />}
-            >
-              Tornar-se anfitriao
-            </Button>
-          </Group>
-
-          <div className="home-air-search-wrap">
-            <div className="home-air-search home-air-search-airbnb">
-              <Popover
-                opened={whereOpen}
-                onChange={setWhereOpen}
-                width={isMobile ? 'min(94vw, 420px)' : 360}
-                position={isMobile ? 'bottom' : 'bottom-start'}
-                shadow="md"
-                offset={10}
-                zIndex={1100}
-                withinPortal
-              >
-                <Popover.Target>
-                  <UnstyledButton className="home-search-trigger" onClick={() => openPanel('where')}>
-                    <Text size="xs" fw={700}>
-                      Onde
-                    </Text>
-                    <Text className="home-search-trigger-value">{search || 'Buscar destinos'}</Text>
-                  </UnstyledButton>
-                </Popover.Target>
-                <Popover.Dropdown className="home-air-panel">
-                  <Stack gap="xs">
-                    <TextInput
-                      placeholder="Digite cidade, bairro ou ponto"
-                      value={destinationInput}
-                      onChange={(event) => setDestinationInput(event.currentTarget.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') {
-                          applyDestination(destinationInput.trim() || search);
-                        }
-                      }}
-                    />
-
-                    <Text size="xs" c="dimmed" fw={600}>
-                      Destinos sugeridos
-                    </Text>
-
-                    {destinationSuggestions.map((destination) => (
-                      <button
-                        key={destination}
-                        type="button"
-                        className="home-air-suggestion"
-                        onClick={() => applyDestination(destination)}
-                      >
-                        <span>{destination}</span>
-                      </button>
-                    ))}
-                  </Stack>
-                </Popover.Dropdown>
-              </Popover>
-
-              <div className="home-air-divider" />
-
-              <Popover
-                opened={whenOpen}
-                onChange={setWhenOpen}
-                width={isMobile ? 'min(96vw, 760px)' : 760}
-                position="bottom"
-                shadow="md"
-                offset={10}
-                zIndex={1100}
-                withinPortal
-              >
-                <Popover.Target>
-                  <UnstyledButton className="home-search-trigger" onClick={() => openPanel('when')}>
-                    <Text size="xs" fw={700}>
-                      Quando
-                    </Text>
-                    <Text className="home-search-trigger-value">{formatDateRange(dateRange)}</Text>
-                  </UnstyledButton>
-                </Popover.Target>
-                <Popover.Dropdown className="home-air-panel home-air-panel-calendar">
-                  <Stack gap="sm">
-                    <Group gap="xs">
-                      {rentTypeToggleData.map((item) => (
-                        <button
-                          key={item.label}
-                          type="button"
-                          className={`home-air-pill ${rentType === item.value ? 'active' : ''}`}
-                          onClick={() => setRentType(item.value)}
-                        >
-                          {item.label}
-                        </button>
-                      ))}
-                    </Group>
-
-                    <DatePicker
-                      type="range"
-                      numberOfColumns={isMobile ? 1 : 2}
-                      locale="pt-BR"
-                      value={dateRange}
-                      onChange={setDateRange}
-                      minDate={new Date()}
-                    />
-                  </Stack>
-                </Popover.Dropdown>
-              </Popover>
-
-              <div className="home-air-divider" />
-
-              <Popover
-                opened={whoOpen}
-                onChange={setWhoOpen}
-                width={isMobile ? 'min(94vw, 420px)' : 360}
-                position={isMobile ? 'bottom' : 'bottom-end'}
-                shadow="md"
-                offset={10}
-                zIndex={1100}
-                withinPortal
-              >
-                <Popover.Target>
-                  <UnstyledButton className="home-search-trigger" onClick={() => openPanel('who')}>
-                    <Text size="xs" fw={700}>
-                      Quem
-                    </Text>
-                    <Text className="home-search-trigger-value">{whoLabel}</Text>
-                  </UnstyledButton>
-                </Popover.Target>
-                <Popover.Dropdown className="home-air-panel">
-                  <Stack gap="sm">
-                    <div className="home-guest-row">
-                      <div>
-                        <Text fw={700}>Adultos</Text>
-                        <Text size="sm" c="dimmed">
-                          13 anos ou mais
-                        </Text>
-                      </div>
-                      <Group gap={8}>
-                        <button type="button" className="home-guest-btn" onClick={() => updateGuest('adults', -1)}>
-                          <Minus size={14} />
-                        </button>
-                        <Text fw={700}>{guests.adults}</Text>
-                        <button type="button" className="home-guest-btn" onClick={() => updateGuest('adults', 1)}>
-                          <Plus size={14} />
-                        </button>
-                      </Group>
-                    </div>
-
-                    <div className="home-guest-row">
-                      <div>
-                        <Text fw={700}>Criancas</Text>
-                        <Text size="sm" c="dimmed">
-                          De 2 a 12 anos
-                        </Text>
-                      </div>
-                      <Group gap={8}>
-                        <button type="button" className="home-guest-btn" onClick={() => updateGuest('children', -1)}>
-                          <Minus size={14} />
-                        </button>
-                        <Text fw={700}>{guests.children}</Text>
-                        <button type="button" className="home-guest-btn" onClick={() => updateGuest('children', 1)}>
-                          <Plus size={14} />
-                        </button>
-                      </Group>
-                    </div>
-
-                    <div className="home-guest-row">
-                      <div>
-                        <Text fw={700}>Bebes</Text>
-                        <Text size="sm" c="dimmed">
-                          Menor de 2
-                        </Text>
-                      </div>
-                      <Group gap={8}>
-                        <button type="button" className="home-guest-btn" onClick={() => updateGuest('babies', -1)}>
-                          <Minus size={14} />
-                        </button>
-                        <Text fw={700}>{guests.babies}</Text>
-                        <button type="button" className="home-guest-btn" onClick={() => updateGuest('babies', 1)}>
-                          <Plus size={14} />
-                        </button>
-                      </Group>
-                    </div>
-
-                    <div className="home-guest-row">
-                      <div>
-                        <Text fw={700}>Animais de estimacao</Text>
-                        <Text size="sm" c="dimmed">
-                          Vai levar um animal?
-                        </Text>
-                      </div>
-                      <Group gap={8}>
-                        <button type="button" className="home-guest-btn" onClick={() => updateGuest('pets', -1)}>
-                          <Minus size={14} />
-                        </button>
-                        <Text fw={700}>{guests.pets}</Text>
-                        <button type="button" className="home-guest-btn" onClick={() => updateGuest('pets', 1)}>
-                          <Plus size={14} />
-                        </button>
-                      </Group>
-                    </div>
-                  </Stack>
-                </Popover.Dropdown>
-              </Popover>
-
-              <motion.div whileHover={{ y: -1 }} whileTap={{ scale: 0.99 }}>
-                <Button
-                className="home-air-search-submit"
-                radius="xl"
-                leftSection={<Search size={16} />}
+      <Card radius="xl" withBorder p={isMobile ? 'md' : 'lg'} className="home-discovery-shell">
+        <Popover
+          opened={searchMenuOpen}
+          onChange={setSearchMenuOpen}
+          width={isMobile ? 'min(96vw, 620px)' : 760}
+          position="bottom"
+          shadow="md"
+          offset={10}
+          zIndex={1200}
+          withinPortal
+        >
+          <Popover.Target>
+            <motion.div whileHover={{ y: -1 }} whileTap={{ scale: 0.995 }}>
+              <UnstyledButton
+                className="home-discovery-trigger"
                 onClick={() => {
-                  if (destinationInput.trim()) {
-                    setSearch(destinationInput.trim());
-                  }
-                  closeAllPanels();
+                  setDestinationInput((current) => current || search);
+                  setSearchMenuOpen(true);
                 }}
               >
+                <div className="home-discovery-trigger-main">
+                  <Text fw={700}>Pesquisar</Text>
+                  <Text className="home-discovery-trigger-sub">{whereLabel}</Text>
+                </div>
+
+                <div className="home-discovery-trigger-meta">
+                  <span>
+                    <CalendarDays size={13} /> {formatDateRange(dateRange)}
+                  </span>
+                  <span>
+                    <Users size={13} /> {whoLabel}
+                  </span>
+                </div>
+
+                <span className="home-discovery-trigger-search" aria-hidden>
+                  <Search size={16} />
+                </span>
+              </UnstyledButton>
+            </motion.div>
+          </Popover.Target>
+
+          <Popover.Dropdown className="home-discovery-panel">
+            <Stack gap="md">
+              <Stack gap={8}>
+                <Text fw={700}>Onde</Text>
+                <TextInput
+                  placeholder="Pesquise cidade, bairro ou regiao"
+                  value={destinationInput}
+                  onChange={(event) => {
+                    setUseNearbyMode(false);
+                    setDestinationInput(event.currentTarget.value);
+                  }}
+                  leftSection={<Search size={14} />}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      applySearch();
+                    }
+                  }}
+                />
+
+                <Group gap="xs" wrap="wrap" className="home-nearby-grid">
+                  {nearbyOptions.map((option) => (
+                    <button
+                      key={option.key}
+                      type="button"
+                      className={`home-nearby-btn ${useNearbyMode && option.key === 'nearby' ? 'active' : ''}`}
+                      onClick={() => {
+                        void selectNearby(option);
+                      }}
+                    >
+                      <span className="home-nearby-btn-icon">
+                        <UseAnimations animation={option.animation} size={16} strokeColor={option.color} autoplay loop speed={0.85} />
+                      </span>
+                      <span className="home-nearby-btn-copy">
+                        <strong>{option.label}</strong>
+                        <small>{option.hint}</small>
+                      </span>
+                    </button>
+                  ))}
+                </Group>
+
+                {locating ? (
+                  <Text size="xs" c="dimmed">
+                    Capturando sua localizacao para ordenar resultados...
+                  </Text>
+                ) : null}
+
+                {useNearbyMode ? (
+                  <Group gap={6} className="home-nearby-mode-pill">
+                    <LocateFixed size={13} />
+                    <Text size="xs" fw={600}>
+                      Modo perto de voce ativado
+                    </Text>
+                  </Group>
+                ) : null}
+              </Stack>
+
+              <Stack gap={8}>
+                <Text fw={700}>Quando</Text>
+                <DatePicker
+                  type="range"
+                  numberOfColumns={isMobile ? 1 : 2}
+                  locale="pt-BR"
+                  value={dateRange}
+                  onChange={setDateRange}
+                  minDate={new Date()}
+                />
+              </Stack>
+
+              <Stack gap={8}>
+                <Text fw={700}>Quem</Text>
+
+                <div className="home-guest-row">
+                  <div>
+                    <Text fw={700}>Adultos</Text>
+                    <Text size="sm" c="dimmed">
+                      13 anos ou mais
+                    </Text>
+                  </div>
+                  <Group gap={8}>
+                    <button type="button" className="home-guest-btn" onClick={() => updateGuest('adults', -1)}>
+                      <Minus size={14} />
+                    </button>
+                    <Text fw={700}>{guests.adults}</Text>
+                    <button type="button" className="home-guest-btn" onClick={() => updateGuest('adults', 1)}>
+                      <Plus size={14} />
+                    </button>
+                  </Group>
+                </div>
+
+                <div className="home-guest-row">
+                  <div>
+                    <Text fw={700}>Criancas</Text>
+                    <Text size="sm" c="dimmed">
+                      De 2 a 12 anos
+                    </Text>
+                  </div>
+                  <Group gap={8}>
+                    <button type="button" className="home-guest-btn" onClick={() => updateGuest('children', -1)}>
+                      <Minus size={14} />
+                    </button>
+                    <Text fw={700}>{guests.children}</Text>
+                    <button type="button" className="home-guest-btn" onClick={() => updateGuest('children', 1)}>
+                      <Plus size={14} />
+                    </button>
+                  </Group>
+                </div>
+
+                <div className="home-guest-row">
+                  <div>
+                    <Text fw={700}>Bebes</Text>
+                    <Text size="sm" c="dimmed">
+                      Menor de 2 anos
+                    </Text>
+                  </div>
+                  <Group gap={8}>
+                    <button type="button" className="home-guest-btn" onClick={() => updateGuest('babies', -1)}>
+                      <Minus size={14} />
+                    </button>
+                    <Text fw={700}>{guests.babies}</Text>
+                    <button type="button" className="home-guest-btn" onClick={() => updateGuest('babies', 1)}>
+                      <Plus size={14} />
+                    </button>
+                  </Group>
+                </div>
+
+                <div className="home-guest-row">
+                  <div>
+                    <Text fw={700}>Pets</Text>
+                    <Text size="sm" c="dimmed">
+                      Vai levar animal?
+                    </Text>
+                  </div>
+                  <Group gap={8}>
+                    <button type="button" className="home-guest-btn" onClick={() => updateGuest('pets', -1)}>
+                      <Minus size={14} />
+                    </button>
+                    <Text fw={700}>{guests.pets}</Text>
+                    <button type="button" className="home-guest-btn" onClick={() => updateGuest('pets', 1)}>
+                      <Plus size={14} />
+                    </button>
+                  </Group>
+                </div>
+              </Stack>
+
+              <Button radius="xl" leftSection={<Search size={16} />} className="home-discovery-submit" onClick={applySearch}>
                 Buscar
               </Button>
-              </motion.div>
-            </div>
-          </div>
-        </Stack>
+            </Stack>
+          </Popover.Dropdown>
+        </Popover>
       </Card>
 
       {loading ? <Text c="dimmed">Carregando propriedades...</Text> : null}
       {errorMessage ? <Text c="red">{errorMessage}</Text> : null}
 
       {!loading && !errorMessage ? (
-        filteredProperties.length > 0 ? (
+        sortedProperties.length > 0 ? (
           <Stack gap="xl">
             <section className="home-carousel-section">
-              <Title order={3}>Acomodacoes em Balneario Cassino</Title>
+              <Group gap={8} align="center" className="home-section-title-row">
+                <UseAnimations animation={starAnimated} size={18} strokeColor="#1f5ed6" autoplay loop speed={0.75} />
+                <Title order={3}>Acomodacoes em Balneario Cassino</Title>
+              </Group>
+              <Text size="sm" c="dimmed" className="home-section-subtitle">
+                Opcoes selecionadas para seu perfil de busca.
+              </Text>
               <div className="home-horizontal-scroll">
                 {rowOneProperties.map((property) => (
                   <PropertyCard key={property.id} property={property} />
@@ -460,7 +502,13 @@ export function HomePage() {
             </section>
 
             <section className="home-carousel-section">
-              <Title order={3}>Acomodacoes muito procuradas em Rio Grande</Title>
+              <Group gap={8} align="center" className="home-section-title-row">
+                <UseAnimations animation={starAnimated} size={18} strokeColor="#1f5ed6" autoplay loop speed={0.75} />
+                <Title order={3}>Acomodacoes muito procuradas em Rio Grande</Title>
+              </Group>
+              <Text size="sm" c="dimmed" className="home-section-subtitle">
+                Casas e apartamentos com maior procura na regiao.
+              </Text>
               <div className="home-horizontal-scroll">
                 {rowTwoProperties.map((property) => (
                   <PropertyCard key={property.id} property={property} />
