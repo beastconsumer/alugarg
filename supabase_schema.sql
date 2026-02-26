@@ -20,6 +20,26 @@ $$;
 
 grant execute on function public.is_admin() to anon, authenticated;
 
+create or replace function public.is_user_blocked(p_uid uuid default auth.uid())
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select
+    case
+      when p_uid is null then false
+      else exists (
+        select 1
+        from public.users u
+        where u.id = p_uid
+          and coalesce(u.is_blocked, false)
+      )
+    end;
+$$;
+
+grant execute on function public.is_user_blocked(uuid) to anon, authenticated;
+
 -- Users table
 create table if not exists public.users (
   id uuid primary key default auth.uid(),
@@ -35,6 +55,9 @@ create table if not exists public.users (
   host_document_front_path text not null default '',
   host_document_back_path text not null default '',
   host_verification_submitted_at timestamptz,
+  is_blocked boolean not null default false,
+  blocked_reason text not null default '',
+  blocked_at timestamptz,
   created_at timestamptz not null default now()
 );
 
@@ -47,11 +70,15 @@ alter table public.users add column if not exists host_document_type text not nu
 alter table public.users add column if not exists host_document_front_path text not null default '';
 alter table public.users add column if not exists host_document_back_path text not null default '';
 alter table public.users add column if not exists host_verification_submitted_at timestamptz;
+alter table public.users add column if not exists is_blocked boolean not null default false;
+alter table public.users add column if not exists blocked_reason text not null default '';
+alter table public.users add column if not exists blocked_at timestamptz;
 
 alter table public.users enable row level security;
 
 drop policy if exists "Users manage own profile" on public.users;
 drop policy if exists "Admins read all users" on public.users;
+drop policy if exists "Admins manage all users" on public.users;
 
 create policy "Users manage own profile"
 on public.users
@@ -63,6 +90,12 @@ create policy "Admins read all users"
 on public.users
 for select
 using (public.is_admin());
+
+create policy "Admins manage all users"
+on public.users
+for all
+using (public.is_admin())
+with check (public.is_admin());
 
 -- Keep admin access locked to the official admin phone.
 update public.users
@@ -265,8 +298,8 @@ using (status = 'approved');
 create policy "Owners manage own properties"
 on public.properties
 for all
-using (auth.uid() = owner_id)
-with check (auth.uid() = owner_id);
+using (auth.uid() = owner_id and not public.is_user_blocked(auth.uid()))
+with check (auth.uid() = owner_id and not public.is_user_blocked(auth.uid()));
 
 create policy "Admins manage all properties"
 on public.properties
@@ -311,29 +344,29 @@ drop policy if exists "Admins manage all bookings" on public.bookings;
 create policy "Renters create own bookings"
 on public.bookings
 for insert
-with check (auth.uid() = renter_id);
+with check (auth.uid() = renter_id and not public.is_user_blocked(auth.uid()));
 
 create policy "Renters read own bookings"
 on public.bookings
 for select
-using (auth.uid() = renter_id);
+using (auth.uid() = renter_id and not public.is_user_blocked(auth.uid()));
 
 create policy "Renters update own bookings"
 on public.bookings
 for update
-using (auth.uid() = renter_id)
-with check (auth.uid() = renter_id);
+using (auth.uid() = renter_id and not public.is_user_blocked(auth.uid()))
+with check (auth.uid() = renter_id and not public.is_user_blocked(auth.uid()));
 
 create policy "Owners read own bookings"
 on public.bookings
 for select
-using (auth.uid() = owner_id);
+using (auth.uid() = owner_id and not public.is_user_blocked(auth.uid()));
 
 create policy "Owners update own bookings"
 on public.bookings
 for update
-using (auth.uid() = owner_id)
-with check (auth.uid() = owner_id);
+using (auth.uid() = owner_id and not public.is_user_blocked(auth.uid()))
+with check (auth.uid() = owner_id and not public.is_user_blocked(auth.uid()));
 
 create policy "Admins manage all bookings"
 on public.bookings
@@ -449,6 +482,7 @@ on public.chat_conversations
 for select
 using (
   (auth.uid() = renter_id or auth.uid() = owner_id)
+  and not public.is_user_blocked(auth.uid())
   and exists (
     select 1
     from public.bookings b
@@ -462,6 +496,7 @@ on public.chat_conversations
 for insert
 with check (
   (auth.uid() = renter_id or auth.uid() = owner_id)
+  and not public.is_user_blocked(auth.uid())
   and exists (
     select 1
     from public.bookings b
@@ -478,6 +513,7 @@ on public.chat_conversations
 for update
 using (
   (auth.uid() = renter_id or auth.uid() = owner_id)
+  and not public.is_user_blocked(auth.uid())
   and exists (
     select 1
     from public.bookings b
@@ -487,6 +523,7 @@ using (
 )
 with check (
   (auth.uid() = renter_id or auth.uid() = owner_id)
+  and not public.is_user_blocked(auth.uid())
   and exists (
     select 1
     from public.bookings b
@@ -543,6 +580,8 @@ create policy "Participants read own messages"
 on public.chat_messages
 for select
 using (
+  not public.is_user_blocked(auth.uid())
+  and
   exists (
     select 1
     from public.chat_conversations c
@@ -558,6 +597,7 @@ on public.chat_messages
 for insert
 with check (
   auth.uid() = sender_id
+  and not public.is_user_blocked(auth.uid())
   and not is_system
   and exists (
     select 1
@@ -667,6 +707,10 @@ begin
     raise exception 'forbidden';
   end if;
 
+  if public.is_user_blocked(auth.uid()) and not public.is_admin() then
+    raise exception 'user_blocked';
+  end if;
+
   if v_booking.status not in ('pre_checking', 'checked_in', 'checked_out') then
     raise exception 'chat_unavailable_until_payment';
   end if;
@@ -743,7 +787,7 @@ drop policy if exists "Admins manage reviews" on public.owner_reviews;
 create policy "Renters insert own reviews"
 on public.owner_reviews
 for insert
-with check (auth.uid() = renter_id);
+with check (auth.uid() = renter_id and not public.is_user_blocked(auth.uid()));
 
 create policy "Authenticated read reviews"
 on public.owner_reviews
@@ -755,6 +799,59 @@ on public.owner_reviews
 for all
 using (public.is_admin())
 with check (public.is_admin());
+
+-- Extra write guard: blocked users cannot mutate core business tables.
+create or replace function public.blocked_user_write_guard()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is not null
+     and not public.is_admin()
+     and public.is_user_blocked(auth.uid()) then
+    raise exception 'user_blocked';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_guard_blocked_user_properties on public.properties;
+create trigger trg_guard_blocked_user_properties
+before insert or update
+on public.properties
+for each row
+execute function public.blocked_user_write_guard();
+
+drop trigger if exists trg_guard_blocked_user_bookings on public.bookings;
+create trigger trg_guard_blocked_user_bookings
+before insert or update
+on public.bookings
+for each row
+execute function public.blocked_user_write_guard();
+
+drop trigger if exists trg_guard_blocked_user_conversations on public.chat_conversations;
+create trigger trg_guard_blocked_user_conversations
+before insert or update
+on public.chat_conversations
+for each row
+execute function public.blocked_user_write_guard();
+
+drop trigger if exists trg_guard_blocked_user_messages on public.chat_messages;
+create trigger trg_guard_blocked_user_messages
+before insert or update
+on public.chat_messages
+for each row
+execute function public.blocked_user_write_guard();
+
+drop trigger if exists trg_guard_blocked_user_reviews on public.owner_reviews;
+create trigger trg_guard_blocked_user_reviews
+before insert or update
+on public.owner_reviews
+for each row
+execute function public.blocked_user_write_guard();
 
 -- Storage policies (bucket: property-images)
 -- Create the bucket manually in Supabase Storage as PUBLIC.

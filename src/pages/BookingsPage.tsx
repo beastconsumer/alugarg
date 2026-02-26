@@ -1,34 +1,54 @@
-import { useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
+  ActionIcon,
   Alert,
   Badge,
   Button,
   Card,
   Group,
-  SimpleGrid,
+  Modal,
+  Skeleton,
   Stack,
-  Tabs,
   Text,
+  TextInput,
+  Textarea,
   Title,
 } from '@mantine/core';
-import { CalendarCheck2, CircleDollarSign, Clock3, House } from 'lucide-react';
+import { AlertCircle, CalendarDays, House, MapPin, MessageCircleMore, Star } from 'lucide-react';
 import { findSeedPropertyById } from '../lib/seedProperties';
 import { useAuth } from '../state/AuthContext';
 import { formatDate, formatMoney } from '../lib/format';
 import { supabase } from '../lib/supabase';
 import { Booking, parseBooking, parseProperty } from '../lib/types';
 
-const bookingStatusMeta: Record<
-  Booking['status'],
-  { label: string; color: 'yellow' | 'teal' | 'blue' | 'gray' | 'red' }
-> = {
-  pending_payment: { label: 'Pagamento pendente', color: 'yellow' },
-  pre_checking: { label: 'Pre-checking', color: 'teal' },
-  confirmed: { label: 'Check-in pendente', color: 'teal' },
-  checked_in: { label: 'Check-in realizado', color: 'blue' },
-  checked_out: { label: 'Finalizada', color: 'gray' },
+const statusMeta: Record<Booking['status'], { label: string; color: 'yellow' | 'teal' | 'blue' | 'gray' | 'red' | 'orange' }> = {
+  pending_payment: { label: 'Pagar agora', color: 'orange' },
+  pre_checking: { label: 'Check-in pendente', color: 'teal' },
+  confirmed: { label: 'Confirmada', color: 'teal' },
+  checked_in: { label: 'Em andamento', color: 'blue' },
+  checked_out: { label: 'Concluida', color: 'gray' },
   cancelled: { label: 'Cancelada', color: 'red' },
+};
+
+const statusPriority: Record<string, number> = {
+  pending_payment: 0,
+  checked_in: 1,
+  pre_checking: 2,
+  confirmed: 2,
+  checked_out: 3,
+  cancelled: 4,
+};
+
+const parseTagList = (input: string): string[] => {
+  return Array.from(
+    new Set(
+      input
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  ).slice(0, 6);
 };
 
 export function BookingsPage() {
@@ -37,13 +57,27 @@ export function BookingsPage() {
 
   const [renterBookings, setRenterBookings] = useState<Booking[]>([]);
   const [ownerBookings, setOwnerBookings] = useState<Booking[]>([]);
-  const [bookingCoversByPropertyId, setBookingCoversByPropertyId] = useState<Record<string, string>>({});
+  const [coversByPropertyId, setCoversByPropertyId] = useState<Record<string, string>>({});
+  const [reviewedBookings, setReviewedBookings] = useState<Record<string, true>>({});
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
 
+  const [activeReviewBooking, setActiveReviewBooking] = useState<Booking | null>(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
+  const [reviewTagsInput, setReviewTagsInput] = useState('');
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+
+  const closeReviewModal = () => {
+    setActiveReviewBooking(null);
+    setReviewRating(5);
+    setReviewComment('');
+    setReviewTagsInput('');
+    setReviewSubmitting(false);
+  };
+
   const loadData = async () => {
     if (!user) return;
-
     setLoading(true);
     setErrorMessage('');
 
@@ -63,35 +97,52 @@ export function BookingsPage() {
       setOwnerBookings(parsedOwner);
 
       const allBookings = [...parsedRenter, ...parsedOwner];
-      const uniquePropertyIds = Array.from(new Set(allBookings.map((item) => item.property_id).filter(Boolean)));
-
+      const uniqueIds = Array.from(new Set(allBookings.map((b) => b.property_id).filter(Boolean)));
       const nextCovers: Record<string, string> = {};
-      const idsToFetchFromDb: string[] = [];
+      const toFetch: string[] = [];
 
-      uniquePropertyIds.forEach((propertyId) => {
-        const seedProperty = findSeedPropertyById(propertyId);
-        if (seedProperty?.photos?.[0]) {
-          nextCovers[propertyId] = seedProperty.photos[0];
+      uniqueIds.forEach((id) => {
+        const seed = findSeedPropertyById(id);
+        if (seed?.photos?.[0]) {
+          nextCovers[id] = seed.photos[0];
           return;
         }
-        idsToFetchFromDb.push(propertyId);
+        toFetch.push(id);
       });
 
-      if (idsToFetchFromDb.length > 0) {
-        const { data: propertiesRaw, error: propertiesError } = await supabase
-          .from('properties')
-          .select('*')
-          .in('id', idsToFetchFromDb);
-
-        if (propertiesError) throw propertiesError;
-
-        (propertiesRaw ?? []).forEach((row) => {
+      if (toFetch.length > 0) {
+        const { data, error } = await supabase.from('properties').select('*').in('id', toFetch);
+        if (error) throw error;
+        (data ?? []).forEach((row) => {
           const property = parseProperty(row);
           nextCovers[property.id] = property.photos[0] || '/background.png';
         });
       }
 
-      setBookingCoversByPropertyId(nextCovers);
+      setCoversByPropertyId(nextCovers);
+
+      const checkedOutIds = parsedRenter.filter((booking) => booking.status === 'checked_out').map((booking) => booking.id);
+      if (checkedOutIds.length > 0) {
+        const { data: reviewRows, error: reviewError } = await supabase
+          .from('owner_reviews')
+          .select('booking_id')
+          .eq('renter_id', user.id)
+          .in('booking_id', checkedOutIds);
+
+        if (reviewError) throw reviewError;
+
+        const map: Record<string, true> = {};
+        (reviewRows ?? []).forEach((row) => {
+          const bookingId = String(row.booking_id ?? '');
+          if (bookingId) {
+            map[bookingId] = true;
+          }
+        });
+
+        setReviewedBookings(map);
+      } else {
+        setReviewedBookings({});
+      }
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Falha ao carregar reservas');
     } finally {
@@ -109,7 +160,6 @@ export function BookingsPage() {
         .from('bookings')
         .update({ status, updated_at: new Date().toISOString() })
         .eq('id', bookingId);
-
       if (error) throw error;
       await loadData();
     } catch (error) {
@@ -117,255 +167,377 @@ export function BookingsPage() {
     }
   };
 
-  const renterStats = useMemo(() => {
-    const pendingPayment = renterBookings.filter((item) => item.status === 'pending_payment').length;
-    const active = renterBookings.filter(
-      (item) => item.status === 'pre_checking' || item.status === 'confirmed' || item.status === 'checked_in',
-    ).length;
-    const completed = renterBookings.filter((item) => item.status === 'checked_out').length;
+  const submitOwnerReview = async (event: FormEvent) => {
+    event.preventDefault();
 
-    return { pendingPayment, active, completed };
-  }, [renterBookings]);
+    if (!user || !activeReviewBooking) return;
 
-  const ownerStats = useMemo(() => {
-    const upcoming = ownerBookings.filter((item) => item.status === 'pre_checking' || item.status === 'confirmed').length;
-    const inStay = ownerBookings.filter((item) => item.status === 'checked_in').length;
-    const totalPayout = ownerBookings
-      .filter(
-        (item) =>
-          item.status === 'pre_checking' ||
-          item.status === 'confirmed' ||
-          item.status === 'checked_in' ||
-          item.status === 'checked_out',
-      )
-      .reduce((acc, item) => acc + item.owner_payout_amount, 0);
+    const comment = reviewComment.trim();
+    if (reviewRating < 1 || reviewRating > 5) {
+      setErrorMessage('A nota deve ser entre 1 e 5.');
+      return;
+    }
 
-    return { upcoming, inStay, totalPayout };
-  }, [ownerBookings]);
+    setReviewSubmitting(true);
+    setErrorMessage('');
+
+    try {
+      const payload = {
+        booking_id: activeReviewBooking.id,
+        property_id: activeReviewBooking.property_id,
+        renter_id: user.id,
+        owner_id: activeReviewBooking.owner_id,
+        rating: reviewRating,
+        tags: parseTagList(reviewTagsInput),
+        comment,
+      };
+
+      const { error } = await supabase.from('owner_reviews').insert(payload);
+      if (error) throw error;
+
+      setReviewedBookings((current) => ({
+        ...current,
+        [activeReviewBooking.id]: true,
+      }));
+      closeReviewModal();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Nao foi possivel enviar avaliacao.';
+      if (message.toLowerCase().includes('duplicate') || message.toLowerCase().includes('unique')) {
+        setReviewedBookings((current) => ({
+          ...current,
+          [activeReviewBooking.id]: true,
+        }));
+        closeReviewModal();
+        return;
+      }
+      setErrorMessage(message);
+    } finally {
+      setReviewSubmitting(false);
+    }
+  };
+
+  const sortedRenter = useMemo(
+    () => [...renterBookings].sort((a, b) => (statusPriority[a.status] ?? 9) - (statusPriority[b.status] ?? 9)),
+    [renterBookings],
+  );
+
+  const pendingCount = renterBookings.filter((booking) => booking.status === 'pending_payment').length;
+  const ownerActiveCount = ownerBookings.filter((booking) =>
+    ['pre_checking', 'confirmed', 'checked_in'].includes(booking.status),
+  ).length;
+
+  const sortedOwner = useMemo(
+    () => [...ownerBookings].sort((a, b) => (statusPriority[a.status] ?? 9) - (statusPriority[b.status] ?? 9)),
+    [ownerBookings],
+  );
 
   return (
-    <Stack gap="md" py="md">
-      <Card withBorder radius="xl" p="lg">
-        <Stack gap="xs">
-          <Title order={2}>Reservas</Title>
-          <Text c="dimmed">Acompanhe suas viagens, pagamentos e status da hospedagem.</Text>
+    <Stack gap="lg" py="md">
+      <Modal
+        opened={Boolean(activeReviewBooking)}
+        onClose={closeReviewModal}
+        title="Avaliar estadia"
+        centered
+        radius="lg"
+      >
+        {activeReviewBooking ? (
+          <form onSubmit={submitOwnerReview}>
+            <Stack gap="sm">
+              <Text size="sm" c="dimmed">
+                {activeReviewBooking.property_title}
+              </Text>
+              <Text size="xs" c="dimmed">
+                {formatDate(activeReviewBooking.check_in_date)} - {formatDate(activeReviewBooking.check_out_date)}
+              </Text>
+
+              <Stack gap={6}>
+                <Text size="sm" fw={600}>Como foi sua experiencia?</Text>
+                <Group gap={6}>
+                  {[1, 2, 3, 4, 5].map((value) => {
+                    const active = reviewRating >= value;
+                    return (
+                      <ActionIcon
+                        key={value}
+                        size={36}
+                        radius="xl"
+                        variant={active ? 'filled' : 'light'}
+                        color={active ? 'yellow' : 'gray'}
+                        onClick={() => setReviewRating(value)}
+                        aria-label={`Nota ${value}`}
+                      >
+                        <Star size={18} fill={active ? 'currentColor' : 'none'} />
+                      </ActionIcon>
+                    );
+                  })}
+                </Group>
+              </Stack>
+
+              <TextInput
+                label="Tags (separe por virgula)"
+                placeholder="Limpeza, comunicacao, check-in"
+                value={reviewTagsInput}
+                onChange={(event) => setReviewTagsInput(event.currentTarget.value)}
+              />
+
+              <Textarea
+                label="Comentario"
+                placeholder="Conte como foi a estadia"
+                minRows={3}
+                maxRows={6}
+                value={reviewComment}
+                onChange={(event) => setReviewComment(event.currentTarget.value)}
+              />
+
+              <Group justify="flex-end">
+                <Button variant="default" onClick={closeReviewModal} disabled={reviewSubmitting}>
+                  Cancelar
+                </Button>
+                <Button type="submit" loading={reviewSubmitting}>
+                  Enviar avaliacao
+                </Button>
+              </Group>
+            </Stack>
+          </form>
+        ) : null}
+      </Modal>
+
+      <Card withBorder radius="xl" p="lg" className="bookings-header-card">
+        <Stack gap={4}>
+          <Title order={2}>Viagens</Title>
+          <Text c="dimmed" size="sm">Suas reservas e hospedagens.</Text>
         </Stack>
       </Card>
 
-      {loading ? <Text c="dimmed">Carregando reservas...</Text> : null}
-      {errorMessage ? <Alert color="red">{errorMessage}</Alert> : null}
+      {errorMessage ? (
+        <Alert color="red" icon={<AlertCircle size={16} />} radius="xl">
+          {errorMessage}
+        </Alert>
+      ) : null}
 
-      <Tabs defaultValue="renter" radius="md" keepMounted={false}>
-        <Tabs.List>
-          <Tabs.Tab value="renter">Minhas viagens</Tabs.Tab>
-          {isHost ? <Tabs.Tab value="owner">Hospedagens como anfitriao</Tabs.Tab> : null}
-        </Tabs.List>
+      {pendingCount > 0 && !loading ? (
+        <Alert color="orange" radius="xl" icon={<AlertCircle size={16} />}>
+          {pendingCount === 1
+            ? 'Voce tem 1 reserva aguardando pagamento.'
+            : `Voce tem ${pendingCount} reservas aguardando pagamento.`}
+        </Alert>
+      ) : null}
 
-        <Tabs.Panel value="renter" pt="md">
-          <Stack gap="md">
-            <SimpleGrid cols={{ base: 1, sm: 3 }}>
-              <Card withBorder radius="lg" p="md" className="bookings-kpi-card">
-                <Group justify="space-between">
-                  <Stack gap={2}>
-                    <Text size="sm" c="dimmed">
-                      Pagamento pendente
-                    </Text>
-                    <Title order={3}>{renterStats.pendingPayment}</Title>
-                  </Stack>
-                  <Clock3 size={20} />
-                </Group>
-              </Card>
+      <Card withBorder radius="xl" p={0} className="booking-list-card">
+        <div className="booking-list-head">
+          <Text fw={700} size="sm">Minhas viagens</Text>
+          {!loading && renterBookings.length > 0 ? (
+            <Text size="xs" c="dimmed">{renterBookings.length} reserva{renterBookings.length > 1 ? 's' : ''}</Text>
+          ) : null}
+        </div>
 
-              <Card withBorder radius="lg" p="md" className="bookings-kpi-card">
-                <Group justify="space-between">
-                  <Stack gap={2}>
-                    <Text size="sm" c="dimmed">
-                      Viagens ativas
-                    </Text>
-                    <Title order={3}>{renterStats.active}</Title>
-                  </Stack>
-                  <CalendarCheck2 size={20} />
-                </Group>
-              </Card>
-
-              <Card withBorder radius="lg" p="md" className="bookings-kpi-card">
-                <Group justify="space-between">
-                  <Stack gap={2}>
-                    <Text size="sm" c="dimmed">
-                      Concluidas
-                    </Text>
-                    <Title order={3}>{renterStats.completed}</Title>
-                  </Stack>
-                  <House size={20} />
-                </Group>
-              </Card>
-            </SimpleGrid>
-
-            <Card withBorder radius="xl" p="lg">
-              <Stack gap="md">
-                <Title order={4}>Minhas reservas</Title>
-                {renterBookings.length === 0 ? <Text c="dimmed">Sem reservas no momento.</Text> : null}
-
-                {renterBookings.map((booking) => {
-                  const normalizedStatus: Booking['status'] =
-                    booking.status === 'confirmed' ? 'pre_checking' : booking.status;
-                  const meta = bookingStatusMeta[normalizedStatus];
-
-                  return (
-                    <Card key={booking.id} withBorder radius="lg" p="md" className="booking-card">
-                      <Group wrap="wrap" className="booking-card-row">
-                        <div className="booking-card-cover-wrap">
-                          <img
-                            src={bookingCoversByPropertyId[booking.property_id] || '/background.png'}
-                            alt={booking.property_title}
-                            className="booking-card-cover"
-                          />
-                        </div>
-
-                        <Stack gap="sm" className="booking-card-main">
-                          <Stack gap={5}>
-                            <Text fw={700}>{booking.property_title}</Text>
-                            <Text size="sm" c="dimmed">
-                              {formatDate(booking.check_in_date)} ate {formatDate(booking.check_out_date)}
-                            </Text>
-                            <Text size="sm">Total pago: {formatMoney(booking.total_paid_by_renter)}</Text>
-                            <Badge variant="light" color={meta.color}>
-                              {meta.label}
-                            </Badge>
-                          </Stack>
-
-                          <Group wrap="wrap" gap="xs">
-                            {normalizedStatus === 'pending_payment' ? (
-                              <Button component={Link} to={`/app/checkout/${booking.id}`} size="xs">
-                                Pagar agora
-                              </Button>
-                            ) : null}
-                            {normalizedStatus === 'pre_checking' ? (
-                              <Button size="xs" variant="light" color="teal" disabled>
-                                Check-in pendente
-                              </Button>
-                            ) : null}
-                            {['pre_checking', 'checked_in', 'checked_out'].includes(normalizedStatus) ? (
-                              <Button component={Link} to={`/app/chat?bookingId=${booking.id}`} size="xs" variant="default">
-                                Chat com anfitriao
-                              </Button>
-                            ) : null}
-
-                            {normalizedStatus === 'checked_out' ? (
-                              <Button component={Link} to="/app/profile" size="xs" variant="default">
-                                Avaliar anfitriao
-                              </Button>
-                            ) : null}
-                          </Group>
-                        </Stack>
-                      </Group>
-                    </Card>
-                  );
-                })}
-              </Stack>
-            </Card>
+        {loading ? (
+          <Stack gap={0}>
+            {[1, 2, 3].map((item) => (
+              <div key={item} className="booking-list-item">
+                <Skeleton width={72} height={72} radius={12} />
+                <Stack gap={6} style={{ flex: 1 }}>
+                  <Skeleton height={14} width="60%" radius="md" />
+                  <Skeleton height={12} width="40%" radius="md" />
+                  <Skeleton height={20} width={90} radius="xl" />
+                </Stack>
+                <Skeleton height={30} width={70} radius="xl" />
+              </div>
+            ))}
           </Stack>
-        </Tabs.Panel>
+        ) : sortedRenter.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-state-icon"><MapPin size={30} /></div>
+            <Text fw={700}>Sem viagens ainda</Text>
+            <Text c="dimmed" size="sm">Reserve um imovel para comecar sua proxima aventura.</Text>
+            <Button component={Link} to="/app/home" radius="xl" variant="light" size="sm">
+              Explorar imoveis
+            </Button>
+          </div>
+        ) : (
+          <Stack gap={0}>
+            {sortedRenter.map((booking) => {
+              const norm: Booking['status'] = booking.status === 'confirmed' ? 'pre_checking' : booking.status;
+              const meta = statusMeta[norm];
+              const cover = coversByPropertyId[booking.property_id] || '/background.png';
+              const alreadyReviewed = Boolean(reviewedBookings[booking.id]);
 
-        {isHost ? <Tabs.Panel value="owner" pt="md">
-          <Stack gap="md">
-            <SimpleGrid cols={{ base: 1, sm: 3 }}>
-              <Card withBorder radius="lg" p="md" className="bookings-kpi-card">
-                <Group justify="space-between">
-                  <Stack gap={2}>
-                    <Text size="sm" c="dimmed">
-                      Check-ins pendentes
-                    </Text>
-                    <Title order={3}>{ownerStats.upcoming}</Title>
+              return (
+                <div key={booking.id} className="booking-list-item">
+                  <img
+                    src={cover}
+                    alt={booking.property_title}
+                    className="booking-list-thumb"
+                    onError={(event) => {
+                      (event.target as HTMLImageElement).src = '/background.png';
+                    }}
+                  />
+
+                  <Stack gap={4} className="booking-list-body">
+                    <Text fw={700} size="sm" lineClamp={1}>{booking.property_title}</Text>
+                    <Group gap={4} align="center">
+                      <CalendarDays size={12} style={{ color: '#7a8baa', flexShrink: 0 }} />
+                      <Text size="xs" c="dimmed">
+                        {formatDate(booking.check_in_date)} - {formatDate(booking.check_out_date)}
+                      </Text>
+                    </Group>
+                    <Group gap={8} align="center">
+                      <Badge size="xs" variant="light" color={meta.color} radius="xl">{meta.label}</Badge>
+                      <Text size="xs" c="dimmed">{formatMoney(booking.total_paid_by_renter)}</Text>
+                    </Group>
                   </Stack>
-                  <CalendarCheck2 size={20} />
-                </Group>
-              </Card>
 
-              <Card withBorder radius="lg" p="md" className="bookings-kpi-card">
-                <Group justify="space-between">
-                  <Stack gap={2}>
-                    <Text size="sm" c="dimmed">
-                      Hospedagens em curso
-                    </Text>
-                    <Title order={3}>{ownerStats.inStay}</Title>
-                  </Stack>
-                  <House size={20} />
-                </Group>
-              </Card>
-
-              <Card withBorder radius="lg" p="md" className="bookings-kpi-card">
-                <Group justify="space-between">
-                  <Stack gap={2}>
-                    <Text size="sm" c="dimmed">
-                      Repasse acumulado
-                    </Text>
-                    <Title order={4}>{formatMoney(ownerStats.totalPayout)}</Title>
-                  </Stack>
-                  <CircleDollarSign size={20} />
-                </Group>
-              </Card>
-            </SimpleGrid>
-
-            <Card withBorder radius="xl" p="lg">
-              <Stack gap="md">
-                <Title order={4}>Reservas dos meus anuncios</Title>
-                {ownerBookings.length === 0 ? <Text c="dimmed">Sem reservas nos seus imoveis.</Text> : null}
-
-                {ownerBookings.map((booking) => {
-                  const normalizedStatus: Booking['status'] =
-                    booking.status === 'confirmed' ? 'pre_checking' : booking.status;
-                  const meta = bookingStatusMeta[normalizedStatus];
-                  return (
-                    <Card key={booking.id} withBorder radius="lg" p="md" className="booking-card">
-                      <Group wrap="wrap" className="booking-card-row">
-                        <div className="booking-card-cover-wrap">
-                          <img
-                            src={bookingCoversByPropertyId[booking.property_id] || '/background.png'}
-                            alt={booking.property_title}
-                            className="booking-card-cover"
-                          />
-                        </div>
-
-                        <Stack gap="sm" className="booking-card-main">
-                          <Stack gap={5}>
-                            <Text fw={700}>{booking.property_title}</Text>
-                            <Text size="sm" c="dimmed">
-                              {formatDate(booking.check_in_date)} ate {formatDate(booking.check_out_date)}
-                            </Text>
-                            <Text size="sm">Repasse previsto: {formatMoney(booking.owner_payout_amount)}</Text>
-                            <Badge variant="light" color={meta.color}>
-                              {meta.label}
-                            </Badge>
-                          </Stack>
-
-                          <Group wrap="wrap" gap="xs">
-                            {['pre_checking', 'checked_in', 'checked_out'].includes(normalizedStatus) ? (
-                              <Button component={Link} to={`/app/chat?bookingId=${booking.id}`} size="xs" variant="default">
-                                Abrir chat
-                              </Button>
-                            ) : null}
-                            {normalizedStatus === 'pre_checking' ? (
-                              <Button size="xs" variant="default" onClick={() => void updateStatus(booking.id, 'checked_in')}>
-                                Confirmar check-in
-                              </Button>
-                            ) : null}
-                            {normalizedStatus === 'checked_in' ? (
-                              <Button size="xs" onClick={() => void updateStatus(booking.id, 'checked_out')}>
-                                Finalizar estadia
-                              </Button>
-                            ) : null}
-                          </Group>
-                        </Stack>
-                      </Group>
-                    </Card>
-                  );
-                })}
-              </Stack>
-            </Card>
+                  <div className="booking-list-action">
+                    {norm === 'pending_payment' ? (
+                      <Button component={Link} to={`/app/checkout/${booking.id}`} size="xs" color="orange" radius="xl">
+                        Pagar
+                      </Button>
+                    ) : null}
+                    {['pre_checking', 'checked_in', 'checked_out'].includes(norm) ? (
+                      <Button
+                        component={Link}
+                        to={`/app/chat?bookingId=${booking.id}`}
+                        size="xs"
+                        variant="default"
+                        radius="xl"
+                        leftSection={<MessageCircleMore size={13} />}
+                      >
+                        Chat
+                      </Button>
+                    ) : null}
+                    {norm === 'checked_out' ? (
+                      alreadyReviewed ? (
+                        <Button size="xs" radius="xl" variant="light" color="teal" disabled>
+                          Avaliado
+                        </Button>
+                      ) : (
+                        <Button
+                          size="xs"
+                          radius="xl"
+                          color="yellow"
+                          leftSection={<Star size={13} />}
+                          onClick={() => setActiveReviewBooking(booking)}
+                        >
+                          Avaliar
+                        </Button>
+                      )
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })}
           </Stack>
-        </Tabs.Panel> : null}
-      </Tabs>
+        )}
+      </Card>
+
+      {isHost ? (
+        <Card withBorder radius="xl" p={0} className="booking-list-card">
+          <div className="booking-list-head">
+            <Text fw={700} size="sm">Anfitriao</Text>
+            {!loading && ownerActiveCount > 0 ? (
+              <Badge size="xs" color="teal" variant="light" radius="xl">
+                {ownerActiveCount} ativa{ownerActiveCount > 1 ? 's' : ''}
+              </Badge>
+            ) : null}
+          </div>
+
+          {loading ? (
+            <Stack gap={0}>
+              {[1, 2].map((item) => (
+                <div key={item} className="booking-list-item">
+                  <Skeleton width={72} height={72} radius={12} />
+                  <Stack gap={6} style={{ flex: 1 }}>
+                    <Skeleton height={14} width="60%" radius="md" />
+                    <Skeleton height={12} width="40%" radius="md" />
+                    <Skeleton height={20} width={90} radius="xl" />
+                  </Stack>
+                  <Skeleton height={30} width={70} radius="xl" />
+                </div>
+              ))}
+            </Stack>
+          ) : ownerBookings.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-state-icon"><House size={30} /></div>
+              <Text fw={700}>Nenhuma reserva recebida</Text>
+              <Text c="dimmed" size="sm">Quando um hospede reservar seu imovel, aparecera aqui.</Text>
+            </div>
+          ) : (
+            <Stack gap={0}>
+              {sortedOwner.map((booking) => {
+                const norm: Booking['status'] = booking.status === 'confirmed' ? 'pre_checking' : booking.status;
+                const meta = statusMeta[norm];
+                const cover = coversByPropertyId[booking.property_id] || '/background.png';
+
+                return (
+                  <div key={booking.id} className="booking-list-item">
+                    <img
+                      src={cover}
+                      alt={booking.property_title}
+                      className="booking-list-thumb"
+                      onError={(event) => {
+                        (event.target as HTMLImageElement).src = '/background.png';
+                      }}
+                    />
+
+                    <Stack gap={4} className="booking-list-body">
+                      <Text fw={700} size="sm" lineClamp={1}>{booking.property_title}</Text>
+                      <Group gap={4} align="center">
+                        <CalendarDays size={12} style={{ color: '#7a8baa', flexShrink: 0 }} />
+                        <Text size="xs" c="dimmed">
+                          {formatDate(booking.check_in_date)} - {formatDate(booking.check_out_date)}
+                        </Text>
+                      </Group>
+                      <Group gap={8} align="center">
+                        <Badge size="xs" variant="light" color={meta.color} radius="xl">{meta.label}</Badge>
+                        <Text size="xs" c="dimmed">Repasse: {formatMoney(booking.owner_payout_amount)}</Text>
+                      </Group>
+                    </Stack>
+
+                    <div className="booking-list-action">
+                      {norm === 'pre_checking' ? (
+                        <Stack gap={5} align="flex-end">
+                          <Button size="xs" radius="xl" onClick={() => void updateStatus(booking.id, 'checked_in')}>
+                            Check-in
+                          </Button>
+                          <Button
+                            component={Link}
+                            to={`/app/chat?bookingId=${booking.id}`}
+                            size="xs"
+                            variant="default"
+                            radius="xl"
+                          >
+                            Chat
+                          </Button>
+                        </Stack>
+                      ) : null}
+                      {norm === 'checked_in' ? (
+                        <Stack gap={5} align="flex-end">
+                          <Button size="xs" radius="xl" onClick={() => void updateStatus(booking.id, 'checked_out')}>
+                            Finalizar
+                          </Button>
+                          <Button
+                            component={Link}
+                            to={`/app/chat?bookingId=${booking.id}`}
+                            size="xs"
+                            variant="default"
+                            radius="xl"
+                          >
+                            Chat
+                          </Button>
+                        </Stack>
+                      ) : null}
+                      {norm === 'checked_out' ? (
+                        <Button component={Link} to={`/app/chat?bookingId=${booking.id}`} size="xs" variant="subtle" radius="xl">
+                          Chat
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })}
+            </Stack>
+          )}
+        </Card>
+      ) : null}
     </Stack>
   );
 }

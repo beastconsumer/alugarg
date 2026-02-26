@@ -41,6 +41,9 @@ const emptyProfileFromUser = (user: User): UserProfile => ({
   host_document_front_path: '',
   host_document_back_path: '',
   host_verification_submitted_at: null,
+  is_blocked: false,
+  blocked_reason: '',
+  blocked_at: null,
   created_at: new Date().toISOString(),
 });
 
@@ -86,6 +89,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
       host_document_front_path: seed.host_document_front_path,
       host_document_back_path: seed.host_document_back_path,
       host_verification_submitted_at: seed.host_verification_submitted_at,
+      is_blocked: seed.is_blocked,
+      blocked_reason: seed.blocked_reason,
+      blocked_at: seed.blocked_at,
     });
 
     if (upsertError) {

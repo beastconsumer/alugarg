@@ -1,4 +1,5 @@
-﻿import { Navigate, Route, Routes } from 'react-router-dom';
+import { Button } from '@mantine/core';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import { envIssue } from './env';
 import { AppShell } from './components/AppShell';
 import { ErrorScreen } from './components/ErrorScreen';
@@ -21,14 +22,28 @@ import { PropertyDetailPage } from './pages/PropertyDetailPage';
 import { SignUpPage } from './pages/SignUpPage';
 
 function RequireAuth({ children }: { children: JSX.Element }) {
-  const { ready, session } = useAuth();
+  const { ready, session, profile, signOut } = useAuth();
 
   if (!ready) {
-    return <LoadingScreen message="Validando sessao..." />;
+    return <LoadingScreen />;
   }
 
   if (!session) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (profile?.is_blocked) {
+    return (
+      <ErrorScreen
+        title="Conta bloqueada"
+        message={profile.blocked_reason?.trim() || 'Sua conta foi bloqueada por um administrador.'}
+        action={
+          <Button variant="default" onClick={() => void signOut()}>
+            Sair
+          </Button>
+        }
+      />
+    );
   }
 
   return children;
@@ -75,4 +90,3 @@ export function AppRouter() {
     </Routes>
   );
 }
-

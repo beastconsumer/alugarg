@@ -17,8 +17,8 @@ import {
   Title,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { CheckCircle2, Clock3, MessageSquare, RefreshCw, ShieldCheck, ShieldUser, XCircle } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { CheckCircle2, Clock3, Lock, MessageSquare, RefreshCw, Search, ShieldCheck, ShieldUser, Unlock, XCircle } from 'lucide-react';
+import { createSignedDocumentUrlByRef, supabase } from '../lib/supabase';
 import { normalizePhone } from '../lib/phone';
 import { formatDate, formatMoney } from '../lib/format';
 import {
@@ -63,6 +63,22 @@ const hostStatusMeta: Record<
   rejected: { label: 'Rejeitado', color: 'red' },
 };
 
+const getChatSenderRole = (
+  message: ChatMessage,
+  conversation: ChatConversation | null,
+): { label: string; color: 'gray' | 'teal' | 'indigo' | 'blue' } => {
+  if (message.is_system) {
+    return { label: 'Admin', color: 'gray' };
+  }
+  if (conversation && message.sender_id === conversation.owner_id) {
+    return { label: 'Anfitriao', color: 'teal' };
+  }
+  if (conversation && message.sender_id === conversation.renter_id) {
+    return { label: 'Cliente', color: 'indigo' };
+  }
+  return { label: 'Usuario', color: 'blue' };
+};
+
 export function AdminPage() {
   const isMobile = useMediaQuery('(max-width: 900px)');
 
@@ -89,9 +105,12 @@ export function AdminPage() {
   const [chatFilter, setChatFilter] = useState<'all' | 'open' | 'closed' | 'blocked'>('open');
 
   const [usersById, setUsersById] = useState<Record<string, UserProfile>>({});
+  const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const [hostUsers, setHostUsers] = useState<UserProfile[]>([]);
   const [hostDocumentPreviews, setHostDocumentPreviews] = useState<Record<string, HostDocumentPreview>>({});
   const [hostFilter, setHostFilter] = useState<'all' | 'pending' | 'verified' | 'rejected'>('pending');
+  const [userFilter, setUserFilter] = useState<'all' | 'blocked' | 'hosts' | 'admins'>('all');
+  const [userSearch, setUserSearch] = useState('');
 
   const propertyById = useMemo(() => {
     const map: Record<string, Property> = {};
@@ -164,13 +183,51 @@ export function AdminPage() {
       { not_started: 0, pending: 0, verified: 0, rejected: 0 } as Record<UserProfile['host_verification_status'], number>,
     );
 
-    return { propertiesSummary, bookingsSummary, chatsSummary, hostsSummary };
-  }, [bookings, conversations, hostUsers, properties]);
+    const usersSummary = allUsers.reduce(
+      (acc, item) => {
+        acc.total += 1;
+        if (item.is_blocked) acc.blocked += 1;
+        if (item.role === 'admin') acc.admins += 1;
+        if (item.host_verification_status !== 'not_started') acc.hosts += 1;
+        return acc;
+      },
+      { total: 0, blocked: 0, admins: 0, hosts: 0 },
+    );
+
+    return { propertiesSummary, bookingsSummary, chatsSummary, hostsSummary, usersSummary };
+  }, [allUsers, bookings, conversations, hostUsers, properties]);
 
   const filteredHostUsers = useMemo(() => {
     if (hostFilter === 'all') return hostUsers;
     return hostUsers.filter((item) => item.host_verification_status === hostFilter);
   }, [hostFilter, hostUsers]);
+
+  const filteredUsers = useMemo(() => {
+    let current = allUsers;
+
+    if (userFilter === 'blocked') {
+      current = current.filter((item) => item.is_blocked);
+    } else if (userFilter === 'hosts') {
+      current = current.filter((item) => item.host_verification_status !== 'not_started');
+    } else if (userFilter === 'admins') {
+      current = current.filter((item) => item.role === 'admin');
+    }
+
+    const term = userSearch.trim().toLowerCase();
+    if (!term) return current;
+
+    return current.filter((item) => {
+      const haystack = [
+        item.name,
+        item.email,
+        item.phone,
+        item.id,
+      ]
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(term);
+    });
+  }, [allUsers, userFilter, userSearch]);
 
   const hostFilterOptions = useMemo(
     () =>
@@ -190,6 +247,24 @@ export function AdminPage() {
     [isMobile, summary.hostsSummary.pending, summary.hostsSummary.verified, summary.hostsSummary.rejected],
   );
 
+  const userFilterOptions = useMemo(
+    () =>
+      isMobile
+        ? [
+            { label: `Todos (${summary.usersSummary.total})`, value: 'all' },
+            { label: `Bloq (${summary.usersSummary.blocked})`, value: 'blocked' },
+            { label: `Hosts (${summary.usersSummary.hosts})`, value: 'hosts' },
+            { label: `Adm (${summary.usersSummary.admins})`, value: 'admins' },
+          ]
+        : [
+            { label: `Todos (${summary.usersSummary.total})`, value: 'all' },
+            { label: `Bloqueados (${summary.usersSummary.blocked})`, value: 'blocked' },
+            { label: `Anfitrioes (${summary.usersSummary.hosts})`, value: 'hosts' },
+            { label: `Admins (${summary.usersSummary.admins})`, value: 'admins' },
+          ],
+    [isMobile, summary.usersSummary.admins, summary.usersSummary.blocked, summary.usersSummary.hosts, summary.usersSummary.total],
+  );
+
   const loadConversationMessages = async (conversationId: string) => {
     const { data, error } = await supabase
       .from('chat_messages')
@@ -207,14 +282,8 @@ export function AdminPage() {
     }));
   };
 
-  const createSignedDocumentUrl = async (path: string): Promise<string> => {
-    if (!path) return '';
-    if (path.startsWith('http://') || path.startsWith('https://')) {
-      return path;
-    }
-    const { data, error } = await supabase.storage.from('host-documents').createSignedUrl(path, 60 * 60);
-    if (error) return '';
-    return data?.signedUrl || '';
+  const createSignedDocumentUrl = async (storedRef: string): Promise<string> => {
+    return createSignedDocumentUrlByRef(storedRef, 60 * 60);
   };
 
   const loadHostDocumentPreviews = async (users: UserProfile[]) => {
@@ -303,62 +372,35 @@ export function AdminPage() {
     setErrorMessage('');
 
     try {
-      const [propertiesRes, bookingsRes, conversationsRes, hostUsersRes] = await Promise.all([
+      const [propertiesRes, bookingsRes, conversationsRes, usersRes] = await Promise.all([
         supabase.from('properties').select('*').order('created_at', { ascending: false }),
         supabase.from('bookings').select('*').order('created_at', { ascending: false }),
         supabase.from('chat_conversations').select('*').order('last_message_at', { ascending: false }),
-        supabase
-          .from('users')
-          .select('*')
-          .in('host_verification_status', ['pending', 'verified', 'rejected'])
-          .order('host_verification_submitted_at', { ascending: false }),
+        supabase.from('users').select('*').order('created_at', { ascending: false }),
       ]);
 
       if (propertiesRes.error) throw propertiesRes.error;
       if (bookingsRes.error) throw bookingsRes.error;
       if (conversationsRes.error) throw conversationsRes.error;
-      if (hostUsersRes.error) throw hostUsersRes.error;
+      if (usersRes.error) throw usersRes.error;
 
       const parsedProperties = (propertiesRes.data ?? []).map((row) => parseProperty(row));
       const parsedBookings = (bookingsRes.data ?? []).map((row) => parseBooking(row));
       const parsedConversations = (conversationsRes.data ?? []).map((row) => parseChatConversation(row));
-      const parsedHostUsers = (hostUsersRes.data ?? []).map((row) => parseProfile(row));
+      const parsedUsers = (usersRes.data ?? []).map((row) => parseProfile(row));
+      const parsedHostUsers = parsedUsers.filter((item) => item.host_verification_status !== 'not_started');
 
       setProperties(parsedProperties);
       setBookings(parsedBookings);
       setConversations(parsedConversations);
+      setAllUsers(parsedUsers);
       setHostUsers(parsedHostUsers);
 
-      const userIds = new Set<string>();
-      parsedProperties.forEach((item) => userIds.add(item.owner_id));
-      parsedBookings.forEach((item) => {
-        userIds.add(item.renter_id);
-        userIds.add(item.owner_id);
+      const mapped: Record<string, UserProfile> = {};
+      parsedUsers.forEach((item) => {
+        mapped[item.id] = item;
       });
-      parsedConversations.forEach((item) => {
-        userIds.add(item.renter_id);
-        userIds.add(item.owner_id);
-      });
-      parsedHostUsers.forEach((item) => userIds.add(item.id));
-
-      if (userIds.size > 0) {
-        const { data: usersRows, error: usersError } = await supabase
-          .from('users')
-          .select('*')
-          .in('id', Array.from(userIds));
-
-        if (usersError) throw usersError;
-
-        const mapped: Record<string, UserProfile> = {};
-        (usersRows ?? []).forEach((row) => {
-          const parsed = parseProfile(row);
-          mapped[parsed.id] = parsed;
-        });
-
-        setUsersById(mapped);
-      } else {
-        setUsersById({});
-      }
+      setUsersById(mapped);
 
       await loadHostDocumentPreviews(parsedHostUsers);
 
@@ -527,6 +569,30 @@ export function AdminPage() {
     });
   };
 
+  const updateUserBlockStatus = async (userId: string, shouldBlock: boolean) => {
+    if (shouldBlock && userId === sessionUserId) {
+      setErrorMessage('Nao e permitido bloquear a conta admin em uso.');
+      return;
+    }
+
+    await runAdminAction(async () => {
+      const payload = shouldBlock
+        ? {
+            is_blocked: true,
+            blocked_reason: 'Bloqueado por administracao.',
+            blocked_at: new Date().toISOString(),
+          }
+        : {
+            is_blocked: false,
+            blocked_reason: '',
+            blocked_at: null,
+          };
+
+      const { error } = await supabase.from('users').update(payload).eq('id', userId);
+      if (error) throw error;
+    });
+  };
+
   const sendAdminSystemMessage = async (event: FormEvent) => {
     event.preventDefault();
 
@@ -668,7 +734,7 @@ export function AdminPage() {
         </Group>
       </Card>
 
-      <SimpleGrid cols={{ base: 1, xs: 2, md: 5 }} spacing="sm">
+      <SimpleGrid cols={{ base: 1, xs: 2, md: 6 }} spacing="sm">
         <Card withBorder radius="xl" p="md" className="admin-kpi">
           <Text c="dimmed" size="sm" className="admin-muted">
             Anuncios pendentes
@@ -709,6 +775,14 @@ export function AdminPage() {
             {summary.hostsSummary.pending}
           </Title>
         </Card>
+        <Card withBorder radius="xl" p="md" className="admin-kpi">
+          <Text c="dimmed" size="sm" className="admin-muted">
+            Usuarios bloqueados
+          </Text>
+          <Title order={3} className="admin-title">
+            {summary.usersSummary.blocked}
+          </Title>
+        </Card>
       </SimpleGrid>
 
       {loadingData ? (
@@ -723,6 +797,7 @@ export function AdminPage() {
           <Tabs.Tab value="properties">Anuncios</Tabs.Tab>
           <Tabs.Tab value="bookings">Reservas</Tabs.Tab>
           <Tabs.Tab value="hosts">Anfitrioes</Tabs.Tab>
+          <Tabs.Tab value="users">Usuarios</Tabs.Tab>
           <Tabs.Tab value="chats">Suporte</Tabs.Tab>
         </Tabs.List>
 
@@ -1054,6 +1129,137 @@ export function AdminPage() {
           </Stack>
         </Tabs.Panel>
 
+        <Tabs.Panel value="users" pt="md">
+          <Stack gap="sm">
+            <Card withBorder radius="xl" p="md" className="admin-entity-card">
+              <Stack gap="sm">
+                <Group justify="space-between" align="flex-start" wrap="wrap">
+                  <Stack gap={2}>
+                    <Title order={4} className="admin-title">
+                      Gestao de usuarios
+                    </Title>
+                    <Text size="sm" c="dimmed" className="admin-muted">
+                      Visualize fotos, perfil e status de bloqueio para moderacao rapida.
+                    </Text>
+                  </Stack>
+                  <SegmentedControl
+                    value={userFilter}
+                    onChange={(value) => setUserFilter(value as 'all' | 'blocked' | 'hosts' | 'admins')}
+                    data={userFilterOptions}
+                  />
+                </Group>
+
+                <Group gap="xs" wrap="wrap">
+                  <Badge color="blue" variant="light">Total: {summary.usersSummary.total}</Badge>
+                  <Badge color="red" variant="light">Bloqueados: {summary.usersSummary.blocked}</Badge>
+                  <Badge color="teal" variant="light">Anfitrioes: {summary.usersSummary.hosts}</Badge>
+                  <Badge color="indigo" variant="light">Admins: {summary.usersSummary.admins}</Badge>
+                </Group>
+
+                <TextInput
+                  value={userSearch}
+                  onChange={(event) => setUserSearch(event.currentTarget.value)}
+                  placeholder="Buscar por nome, email, telefone ou id"
+                  leftSection={<Search size={15} />}
+                />
+              </Stack>
+            </Card>
+
+            {filteredUsers.map((userItem) => {
+              const isProtectedAdmin = userItem.role === 'admin' || userItem.id === sessionUserId;
+              const hostMeta = hostStatusMeta[userItem.host_verification_status];
+              const initial = (userItem.name || userItem.email || 'U').charAt(0).toUpperCase();
+
+              return (
+                <Card key={userItem.id} withBorder radius="xl" p="md" className="admin-entity-card admin-user-card">
+                  <Group justify="space-between" align="flex-start" wrap="wrap" gap="md">
+                    <Group gap="sm" wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
+                      <div className="admin-user-avatar">
+                        {userItem.avatar_url ? (
+                          <img src={userItem.avatar_url} alt={`Foto de ${userItem.name || 'usuario'}`} className="admin-user-avatar-image" />
+                        ) : (
+                          initial
+                        )}
+                      </div>
+
+                      <Stack gap={2} style={{ minWidth: 0 }}>
+                        <Text fw={700} className="admin-title" lineClamp={1}>
+                          {userItem.name || 'Sem nome'}
+                        </Text>
+                        <Text size="sm" c="dimmed" className="admin-muted" lineClamp={1}>
+                          {userItem.email || '-'}
+                        </Text>
+                        <Text size="sm" c="dimmed" className="admin-muted">
+                          {userItem.phone || '-'}
+                        </Text>
+                        <Group gap={6} wrap="wrap">
+                          <Badge size="xs" variant="light" color={userItem.role === 'admin' ? 'indigo' : 'gray'}>
+                            {userItem.role === 'admin' ? 'Admin' : 'Usuario'}
+                          </Badge>
+                          <Badge size="xs" variant="light" color={hostMeta.color}>
+                            Host: {hostMeta.label}
+                          </Badge>
+                          {userItem.is_blocked ? (
+                            <Badge size="xs" color="red" variant="light">
+                              Bloqueado {userItem.blocked_at ? `em ${formatDate(userItem.blocked_at)}` : ''}
+                            </Badge>
+                          ) : (
+                            <Badge size="xs" color="teal" variant="light">
+                              Ativo
+                            </Badge>
+                          )}
+                        </Group>
+                        {userItem.is_blocked && userItem.blocked_reason ? (
+                          <Text size="xs" c="dimmed" className="admin-muted">
+                            Motivo: {userItem.blocked_reason}
+                          </Text>
+                        ) : null}
+                      </Stack>
+                    </Group>
+
+                    <Group gap="xs" wrap="wrap">
+                      {userItem.is_blocked ? (
+                        <Button
+                          size="xs"
+                          color="teal"
+                          leftSection={<Unlock size={14} />}
+                          loading={actionLoading}
+                          onClick={() => void updateUserBlockStatus(userItem.id, false)}
+                        >
+                          Desbloquear
+                        </Button>
+                      ) : (
+                        <Button
+                          size="xs"
+                          color="red"
+                          variant="light"
+                          leftSection={<Lock size={14} />}
+                          loading={actionLoading}
+                          onClick={() => void updateUserBlockStatus(userItem.id, true)}
+                          disabled={isProtectedAdmin}
+                        >
+                          Bloquear
+                        </Button>
+                      )}
+                      {isProtectedAdmin ? (
+                        <Badge size="xs" color="gray" variant="light">
+                          Conta protegida
+                        </Badge>
+                      ) : null}
+                    </Group>
+                  </Group>
+                </Card>
+              );
+            })}
+
+            {filteredUsers.length === 0 ? (
+              <Text c="dimmed" className="admin-muted">
+                Nenhum usuario encontrado para o filtro atual.
+              </Text>
+            ) : null}
+          </Stack>
+        </Tabs.Panel>
+
         <Tabs.Panel value="chats" pt="md">
           <Card withBorder radius="xl" p="md" className="admin-entity-card">
             <Stack gap="sm">
@@ -1063,7 +1269,7 @@ export function AdminPage() {
                     Central de suporte e chat
                   </Title>
                   <Text size="sm" c="dimmed" className="admin-muted">
-                    Atenda usuarios por conversa de reserva, atualize status e registre avisos oficiais.
+                    Atenda usuarios por conversa de reserva com separacao clara entre cliente e anfitriao.
                   </Text>
                 </Stack>
 
@@ -1122,12 +1328,22 @@ export function AdminPage() {
                               </Text>
                               <Badge variant="light">{conversation.status}</Badge>
                             </Group>
-                            <Text size="xs" c="dimmed" className="admin-muted">
-                              Inquilino: {renter?.name || conversation.renter_id}
-                            </Text>
-                            <Text size="xs" c="dimmed" className="admin-muted">
-                              Proprietario: {owner?.name || conversation.owner_id}
-                            </Text>
+                            <Group gap={6} wrap="wrap">
+                              <Badge size="xs" color="indigo" variant="light">
+                                Cliente
+                              </Badge>
+                              <Text size="xs" c="dimmed" className="admin-muted">
+                                {renter?.name || conversation.renter_id}
+                              </Text>
+                            </Group>
+                            <Group gap={6} wrap="wrap">
+                              <Badge size="xs" color="teal" variant="light">
+                                Anfitriao
+                              </Badge>
+                              <Text size="xs" c="dimmed" className="admin-muted">
+                                {owner?.name || conversation.owner_id}
+                              </Text>
+                            </Group>
                             <Text size="xs" c="dimmed" className="admin-muted">
                               Atualizado: {formatDate(conversation.last_message_at)}
                             </Text>
@@ -1180,6 +1396,7 @@ export function AdminPage() {
                   <Stack gap="xs">
                     {selectedMessages.map((message) => {
                       const sender = usersById[message.sender_id];
+                      const senderRole = getChatSenderRole(message, selectedConversation);
                       const senderName = message.is_system ? 'Sistema/Admin' : sender?.name || 'Usuario';
 
                       return (
@@ -1191,9 +1408,14 @@ export function AdminPage() {
                           className={message.is_system ? 'admin-chat-message system' : 'admin-chat-message'}
                         >
                           <Stack gap={2}>
-                            <Text size="xs" c="dimmed" className="admin-muted">
-                              {senderName} - {formatDate(message.created_at)}
-                            </Text>
+                            <Group gap={6} wrap="wrap">
+                              <Badge size="xs" color={senderRole.color} variant="light">
+                                {senderRole.label}
+                              </Badge>
+                              <Text size="xs" c="dimmed" className="admin-muted">
+                                {senderName} - {formatDate(message.created_at)}
+                              </Text>
+                            </Group>
                             <Text size="sm" className="admin-title">
                               {message.message_text}
                             </Text>

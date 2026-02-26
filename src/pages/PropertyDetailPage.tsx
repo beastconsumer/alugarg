@@ -13,6 +13,7 @@ import {
   Modal,
   NumberInput,
   SimpleGrid,
+  Skeleton,
   Stack,
   Text,
   TextInput,
@@ -42,10 +43,10 @@ import {
 } from 'lucide-react';
 import { findSeedOwnerById, findSeedPropertyById } from '../lib/seedProperties';
 import { useAuth } from '../state/AuthContext';
-import { calculateUnits, formatMoney } from '../lib/format';
+import { calculateUnits, formatDate, formatMoney } from '../lib/format';
 import { getAmenityLabel } from '../lib/propertyCatalog';
 import { supabase } from '../lib/supabase';
-import { parseProfile, parseProperty, Property, UserProfile } from '../lib/types';
+import { OwnerReview, parseOwnerReview, parseProfile, parseProperty, Property, rentTypeLabel, UserProfile } from '../lib/types';
 
 const calculateNights = (checkInDate: string, checkOutDate: string): number => {
   const checkIn = new Date(checkInDate);
@@ -76,17 +77,6 @@ const getAmenityIcon = (amenity: string): LucideIcon => {
   return amenityIconPool[seed % amenityIconPool.length];
 };
 
-const getRating = (seed: string): string => {
-  const total = seed.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const rating = 4.6 + (total % 5) * 0.1;
-  return rating.toFixed(2).replace('.', ',');
-};
-
-const getReviewCount = (seed: string): number => {
-  const total = seed.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  return 10 + (total % 90);
-};
-
 const rentPeriodLabel = (rentType: Property['rent_type']): string => {
   if (rentType === 'diaria') return 'por noite';
   if (rentType === 'temporada') return 'por temporada';
@@ -111,6 +101,9 @@ export function PropertyDetailPage() {
   const [isDateRangeAvailable, setIsDateRangeAvailable] = useState(true);
   const [showAllAmenities, setShowAllAmenities] = useState(false);
   const [showAllPhotosModal, setShowAllPhotosModal] = useState(false);
+  const [reviews, setReviews] = useState<OwnerReview[]>([]);
+  const [reviewersById, setReviewersById] = useState<Record<string, UserProfile>>({});
+  const [ownerAvatarError, setOwnerAvatarError] = useState(false);
 
   useEffect(() => {
     const run = async () => {
@@ -120,6 +113,9 @@ export function PropertyDetailPage() {
       setErrorMessage('');
       setShowAllAmenities(false);
       setShowAllPhotosModal(false);
+      setReviews([]);
+      setReviewersById({});
+      setOwnerAvatarError(false);
 
       try {
         const seedProperty = findSeedPropertyById(id);
@@ -144,6 +140,35 @@ export function PropertyDetailPage() {
           .maybeSingle();
 
         if (ownerData) setOwner(parseProfile(ownerData));
+
+        const { data: reviewsRows, error: reviewsError } = await supabase
+          .from('owner_reviews')
+          .select('*')
+          .eq('property_id', parsedProperty.id)
+          .order('created_at', { ascending: false })
+          .limit(50);
+
+        if (reviewsError) throw reviewsError;
+
+        const parsedReviews = (reviewsRows ?? []).map((row) => parseOwnerReview(row));
+        setReviews(parsedReviews);
+
+        const reviewerIds = Array.from(new Set(parsedReviews.map((item) => item.renter_id).filter(Boolean)));
+        if (reviewerIds.length > 0) {
+          const { data: reviewerRows, error: reviewerError } = await supabase
+            .from('users')
+            .select('*')
+            .in('id', reviewerIds);
+
+          if (reviewerError) throw reviewerError;
+
+          const mappedReviewers: Record<string, UserProfile> = {};
+          (reviewerRows ?? []).forEach((row) => {
+            const parsed = parseProfile(row);
+            mappedReviewers[parsed.id] = parsed;
+          });
+          setReviewersById(mappedReviewers);
+        }
       } catch (error) {
         setErrorMessage(error instanceof Error ? error.message : 'Falha ao carregar detalhe');
       } finally {
@@ -302,8 +327,33 @@ export function PropertyDetailPage() {
 
   if (loading) {
     return (
-      <Stack py="md">
-        <Text c="dimmed">Carregando imovel...</Text>
+      <Stack py="md" gap="lg" style={{ paddingBottom: 'calc(80px + env(safe-area-inset-bottom))' }}>
+        <Group justify="space-between" align="center">
+          <Skeleton height={36} width={90} radius="xl" />
+          <Group gap={6}>
+            <Skeleton height={32} width={32} radius="xl" />
+            <Skeleton height={32} width={32} radius="xl" />
+          </Group>
+        </Group>
+
+        <Skeleton height={38} radius="md" />
+        <Skeleton height={18} width="55%" radius="sm" />
+
+        <Skeleton height={260} radius="xl" />
+
+        <Stack gap={6}>
+          <Skeleton height={20} width="72%" radius="sm" />
+          <Skeleton height={16} width="48%" radius="sm" />
+        </Stack>
+
+        <Group gap={8}>
+          <Skeleton height={30} width={90} radius="xl" />
+          <Skeleton height={30} width={80} radius="xl" />
+          <Skeleton height={30} width={70} radius="xl" />
+        </Group>
+
+        <Skeleton height={72} radius="xl" />
+        <Skeleton height={180} radius="xl" />
       </Stack>
     );
   }
@@ -318,8 +368,13 @@ export function PropertyDetailPage() {
     );
   }
 
-  const rating = getRating(property.id);
-  const reviewCount = getReviewCount(property.id);
+  const reviewCount = reviews.length;
+  const reviewAverage = reviewCount > 0
+    ? reviews.reduce((acc, item) => acc + item.rating, 0) / reviewCount
+    : 0;
+  const ratingLabel = reviewCount > 0 ? reviewAverage.toFixed(1).replace('.', ',') : 'Novo';
+  const ownerAvatarUrl = owner?.avatar_url?.trim() ?? '';
+  const showOwnerAvatar = Boolean(ownerAvatarUrl) && !ownerAvatarError;
   const photosRaw = property.photos.length > 0 ? property.photos : ['/background.png'];
   const photos = photosRaw.length >= 5 ? photosRaw : [...photosRaw, ...Array(5 - photosRaw.length).fill(photosRaw[0])];
   const stayRules = [
@@ -332,7 +387,22 @@ export function PropertyDetailPage() {
   ];
 
   return (
-    <Stack gap="lg" py="md">
+    <Stack gap="lg" py="md" style={{ paddingBottom: 'calc(80px + env(safe-area-inset-bottom))' }}>
+      <div className="detail-mobile-cta">
+        <div>
+          <Text fw={800} size="lg" style={{ lineHeight: 1.1 }}>{formatMoney(property.price)}</Text>
+          <Text size="xs" c="dimmed">{rentPeriodLabel(property.rent_type)}</Text>
+        </div>
+        <Button
+          radius="xl"
+          className="detail-reserve-btn"
+          style={{ minWidth: 140 }}
+          onClick={() => document.getElementById('detail-reserve-section')?.scrollIntoView({ behavior: 'smooth' })}
+        >
+          Reservar
+        </Button>
+      </div>
+
       <Modal opened={showAllPhotosModal} onClose={() => setShowAllPhotosModal(false)} size="xl" title="Todas as fotos">
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
           {photosRaw.map((photo, index) => (
@@ -358,9 +428,31 @@ export function PropertyDetailPage() {
         </Group>
       </Group>
 
-      <Title order={1} className="detail-headline">
-        {property.title}
-      </Title>
+      {/* Title + meta row */}
+      <div>
+        <Title order={1} className="detail-headline">
+          {property.title}
+        </Title>
+
+        <Group gap={6} align="center" className="detail-meta-row" mt={6} wrap="nowrap">
+          <Group gap={3} style={{ flexShrink: 0 }}>
+            <Star size={12} fill="#f59e0b" color="#f59e0b" />
+            <Text size="sm" fw={700}>{ratingLabel}</Text>
+            <Text size="sm" c="dimmed">({reviewCount > 0 ? reviewCount : 'sem avaliacoes'})</Text>
+          </Group>
+          <Text size="sm" c="dimmed">·</Text>
+          <Text
+            size="sm"
+            c="dimmed"
+            style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}
+          >
+            {property.location.addressText || 'Balneario Cassino, RS'}
+          </Text>
+          <Badge size="xs" radius="xl" variant="light" color="blue" style={{ flexShrink: 0 }}>
+            {rentTypeLabel[property.rent_type]}
+          </Badge>
+        </Group>
+      </div>
 
       <div className="detail-gallery-grid">
         <div className="detail-gallery-main">
@@ -388,17 +480,72 @@ export function PropertyDetailPage() {
         </div>
       </div>
 
+      {/* Host card – below gallery */}
+      <Card withBorder radius="xl" p="md" className="detail-host-card">
+        <Group gap="md" justify="space-between" wrap="nowrap">
+          <Group gap="sm" wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
+            <div className="detail-host-avatar">
+              {showOwnerAvatar ? (
+                <img
+                  src={ownerAvatarUrl}
+                  alt={`Foto de ${owner?.name || 'anfitriao'}`}
+                  className="detail-host-avatar-image"
+                  onError={() => setOwnerAvatarError(true)}
+                />
+              ) : (
+                (owner?.name || 'A').charAt(0).toUpperCase()
+              )}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <Text size="xs" fw={600} style={{ textTransform: 'uppercase', letterSpacing: '0.6px', fontSize: 10, color: '#64748b' }}>
+                Anfitrião
+              </Text>
+              <Text fw={700} size="sm">{owner?.name || 'Equipe AlugaSul'}</Text>
+              <Group gap={4} mt={2}>
+                <ShieldCheck size={12} color="#10b981" />
+                <Text size="xs" style={{ color: '#10b981' }}>Perfil verificado</Text>
+              </Group>
+            </div>
+          </Group>
+          {property.verified ? (
+            <Badge radius="xl" color="teal" variant="light" leftSection={<ShieldCheck size={12} />} style={{ flexShrink: 0 }}>
+              Imóvel verificado
+            </Badge>
+          ) : null}
+        </Group>
+      </Card>
+
       <div className="detail-page-grid">
-        <div className="detail-main-column">
+        <Stack gap={28} className="detail-main-column">
+
+          {/* ── Specs ── */}
           <section id="fotos" className="detail-section">
             <Title order={2} className="detail-section-title">
               Espaco inteiro em {property.location.addressText || 'Balneario Cassino'}
             </Title>
-            <Text c="dimmed" size="lg">
-              {property.guests_capacity} hospedes - {property.bedrooms} quarto(s) - {property.bathrooms} banheiro(s)
-            </Text>
+            <Group gap={8} mt={8} className="detail-spec-row" wrap="wrap">
+              <div className="detail-spec-pill">
+                <BedDouble size={13} />
+                <span>{property.bedrooms} quarto{property.bedrooms !== 1 ? 's' : ''}</span>
+              </div>
+              <div className="detail-spec-pill">
+                <Users size={13} />
+                <span>{property.guests_capacity} hospede{property.guests_capacity !== 1 ? 's' : ''}</span>
+              </div>
+              <div className="detail-spec-pill">
+                <Building2 size={13} />
+                <span>{property.bathrooms} banheiro{property.bathrooms !== 1 ? 's' : ''}</span>
+              </div>
+              {property.pet_friendly ? (
+                <div className="detail-spec-pill detail-spec-pill-pet">
+                  <Dog size={13} />
+                  <span>Pets ok</span>
+                </div>
+              ) : null}
+            </Group>
           </section>
 
+          {/* ── Preferido dos hóspedes ── */}
           <Card withBorder radius="xl" p="md" className="detail-preference-card">
             <Group justify="space-between" wrap="wrap" className="detail-preference-row">
               <Group gap={10}>
@@ -409,39 +556,33 @@ export function PropertyDetailPage() {
                   Um dos imoveis mais reservados na plataforma
                 </Text>
               </Group>
-
               <div className="detail-rating-block">
                 <Group gap={4} justify="flex-end">
                   <Star size={14} fill="currentColor" />
-                  <Text fw={700}>{rating}</Text>
+                  <Text fw={700}>{ratingLabel}</Text>
                 </Group>
                 <Text size="xs" c="dimmed" ta="right">
-                  {reviewCount} avaliacoes
+                  {reviewCount > 0 ? `${reviewCount} avaliacoes` : 'Sem avaliacoes ainda'}
                 </Text>
               </div>
             </Group>
           </Card>
 
-          <Group justify="space-between" className="detail-host-row">
-            <Group gap="sm">
-              <div className="detail-host-avatar">{(owner?.name || 'A').charAt(0).toUpperCase()}</div>
-              <div>
-                <Text fw={700}>Anfitriao(a): {owner?.name || 'Equipe AlugaSul'}</Text>
-                <Text c="dimmed" size="sm">
-                  Perfil verificado
-                </Text>
-              </div>
-            </Group>
+          {/* ── Descrição ── */}
+          {property.description ? (
+            <>
+              <Divider />
+              <section id="descricao" className="detail-section">
+                <Title order={3} className="detail-section-title">
+                  Sobre este imovel
+                </Title>
+                <Text className="detail-description">{property.description}</Text>
+              </section>
+            </>
+          ) : null}
 
-            {property.verified ? (
-              <Badge color="teal" leftSection={<ShieldCheck size={13} />}>
-                Verificado
-              </Badge>
-            ) : null}
-          </Group>
-
-          <Divider my="lg" />
-
+          {/* ── Comodidades ── */}
+          <Divider />
           <section id="comodidades" className="detail-section">
             <Title order={3} className="detail-section-title">
               O que esse lugar oferece
@@ -482,9 +623,80 @@ export function PropertyDetailPage() {
             )}
           </section>
 
-          <Divider my="lg" />
-
+          {/* Avaliacoes */}
+          <Divider />
           <section id="avaliacoes" className="detail-section">
+            <Title order={3} className="detail-section-title">
+              Avaliacoes dos hospedes
+            </Title>
+            {reviews.length === 0 ? (
+              <Text c="dimmed" size="sm">
+                Ainda nao existem avaliacoes para este imovel.
+              </Text>
+            ) : (
+              <Stack gap="sm">
+                {reviews.slice(0, 8).map((review) => {
+                  const reviewer = reviewersById[review.renter_id];
+                  const reviewerName = reviewer?.name || 'Hospede';
+                  const reviewerAvatar = reviewer?.avatar_url?.trim() || '';
+
+                  return (
+                    <Card key={review.id} withBorder radius="lg" p="sm" className="detail-review-card">
+                      <Stack gap={8}>
+                        <Group justify="space-between" align="flex-start" wrap="nowrap">
+                          <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
+                            <div className="detail-review-avatar">
+                              {reviewerAvatar ? (
+                                <img
+                                  src={reviewerAvatar}
+                                  alt={`Foto de ${reviewerName}`}
+                                  className="detail-review-avatar-image"
+                                />
+                              ) : (
+                                reviewerName.charAt(0).toUpperCase()
+                              )}
+                            </div>
+                            <div style={{ minWidth: 0 }}>
+                              <Text fw={700} size="sm" lineClamp={1}>
+                                {reviewerName}
+                              </Text>
+                              <Text size="xs" c="dimmed">
+                                {formatDate(review.created_at)}
+                              </Text>
+                            </div>
+                          </Group>
+                          <Group gap={4} style={{ flexShrink: 0 }}>
+                            <Star size={13} fill="#f59e0b" color="#f59e0b" />
+                            <Text size="sm" fw={700}>{review.rating.toFixed(1).replace('.', ',')}</Text>
+                          </Group>
+                        </Group>
+
+                        {review.comment ? (
+                          <Text size="sm" c="dimmed" style={{ lineHeight: 1.55 }}>
+                            {review.comment}
+                          </Text>
+                        ) : null}
+
+                        {review.tags.length > 0 ? (
+                          <Group gap={6} wrap="wrap">
+                            {review.tags.map((tag) => (
+                              <Badge key={`${review.id}-${tag}`} size="xs" radius="xl" variant="light" color="blue">
+                                {tag}
+                              </Badge>
+                            ))}
+                          </Group>
+                        ) : null}
+                      </Stack>
+                    </Card>
+                  );
+                })}
+              </Stack>
+            )}
+          </section>
+
+          {/* Regras */}
+          <Divider />
+          <section id="regras" className="detail-section">
             <Title order={3} className="detail-section-title">
               Regras e politicas
             </Title>
@@ -501,21 +713,16 @@ export function PropertyDetailPage() {
                 );
               })}
             </Group>
-
             {property.house_rules ? (
               <Card withBorder radius="lg" p="sm" mt="sm">
-                <Text size="sm" fw={700}>
-                  Regras da casa
-                </Text>
-                <Text size="sm" c="dimmed">
-                  {property.house_rules}
-                </Text>
+                <Text size="sm" fw={700}>Regras da casa</Text>
+                <Text size="sm" c="dimmed">{property.house_rules}</Text>
               </Card>
             ) : null}
           </section>
 
-          <Divider my="lg" />
-
+          {/* ── Localização ── */}
+          <Divider />
           <section id="localizacao" className="detail-section">
             <Title order={3} className="detail-section-title">
               Localizacao
@@ -526,7 +733,6 @@ export function PropertyDetailPage() {
               <Alert color="blue" variant="light">
                 Chat com o locador so e liberado apos pagamento confirmado e status pre-checking.
               </Alert>
-
               <Button
                 component="a"
                 variant="default"
@@ -541,17 +747,16 @@ export function PropertyDetailPage() {
               </Button>
             </Stack>
           </section>
-        </div>
 
-        <aside className="detail-side-column">
-          <Card withBorder radius="xl" p="md" className="detail-reserve-sticky">
+        </Stack>
+
+        <aside className="detail-side-column" id="detail-reserve-section">
+          <Card withBorder radius="xl" p="lg" className="detail-reserve-sticky">
             <Stack gap="md">
-              <Text className="detail-price-line">
-                <Text span fw={800}>
-                  {formatMoney(property.price)}
-                </Text>{' '}
-                {rentPeriodLabel(property.rent_type)}
-              </Text>
+              <div>
+                <Text component="span" className="detail-price-big">{formatMoney(property.price)}</Text>
+                <Text component="span" className="detail-price-period">{rentPeriodLabel(property.rent_type)}</Text>
+              </div>
 
               <form onSubmit={onCreateBooking}>
                 <Stack gap="sm">
@@ -581,38 +786,56 @@ export function PropertyDetailPage() {
                     hideControls={false}
                   />
 
-                  <Card withBorder radius="lg" className="detail-free-cancel-note" p="xs">
-                    <Text size="xs" c="dimmed" ta="center">
-                      Cancelamento gratuito antes do check-in
-                    </Text>
-                  </Card>
-
-                  {availabilityNotice ? (
-                    <Alert color={isDateRangeAvailable ? 'teal' : 'red'}>{availabilityNotice}</Alert>
+                  {nights > 0 ? (
+                    <div className="detail-nights-badge">
+                      <Clock3 size={14} />
+                      {nights} noite{nights !== 1 ? 's' : ''} selecionada{nights !== 1 ? 's' : ''}
+                    </div>
                   ) : null}
 
-                  {bookingError ? <Alert color="red">{bookingError}</Alert> : null}
+                  {availabilityNotice ? (
+                    <Alert color={isDateRangeAvailable ? 'teal' : 'red'} variant="light" radius="md">
+                      {availabilityNotice}
+                    </Alert>
+                  ) : null}
 
-                  <Button type="submit" className="detail-reserve-btn" disabled={checkingAvailability || !isDateRangeAvailable}>
-                    Reservar e pagar
+                  {bookingError ? <Alert color="red" variant="light" radius="md">{bookingError}</Alert> : null}
+
+                  <Button type="submit" className="detail-reserve-btn" fullWidth disabled={checkingAvailability || !isDateRangeAvailable}>
+                    {checkingAvailability ? 'Verificando disponibilidade...' : 'Reservar e pagar'}
                   </Button>
 
                   <Text size="xs" c="dimmed" ta="center">
-                    Voce ainda nao sera cobrado
+                    Cancelamento gratuito antes do check-in
                   </Text>
                 </Stack>
               </form>
 
-              <Divider />
-
-              <Stack gap={4}>
-                <Text size="sm">Noites selecionadas: {nights}</Text>
-                <Text size="sm">Unidades cobradas: {units}</Text>
-                <Text size="sm">Base da locacao: {formatMoney(amounts.rentalBase)}</Text>
-                <Text size="sm">Taxa limpeza: {formatMoney(amounts.cleaningFee)}</Text>
-                <Text size="sm">Taxa cliente (10%): {formatMoney(amounts.clientFee)}</Text>
-                <Text fw={700}>Total: {formatMoney(amounts.totalPaid)}</Text>
-              </Stack>
+              {units > 0 ? (
+                <>
+                  <Divider />
+                  <Stack gap={0} className="cost-box">
+                    <div className="detail-cost-row">
+                      <Text size="sm" c="dimmed">{formatMoney(property.price)} x {units} {property.rent_type === 'diaria' ? 'noite(s)' : 'unidade(s)'}</Text>
+                      <Text size="sm" fw={600}>{formatMoney(amounts.rentalBase)}</Text>
+                    </div>
+                    {amounts.cleaningFee > 0 ? (
+                      <div className="detail-cost-row">
+                        <Text size="sm" c="dimmed">Taxa de limpeza</Text>
+                        <Text size="sm" fw={600}>{formatMoney(amounts.cleaningFee)}</Text>
+                      </div>
+                    ) : null}
+                    <div className="detail-cost-row">
+                      <Text size="sm" c="dimmed">Taxa de servico (10%)</Text>
+                      <Text size="sm" fw={600}>{formatMoney(amounts.clientFee)}</Text>
+                    </div>
+                    <div className="detail-cost-row total">
+                      <Text fw={700}>Total</Text>
+                      <Text fw={800}>{formatMoney(amounts.totalPaid)}</Text>
+                    </div>
+                  </Stack>
+                </>
+              ) : null}
             </Stack>
           </Card>
         </aside>

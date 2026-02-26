@@ -63,6 +63,9 @@ export interface UserProfile {
   host_document_front_path: string;
   host_document_back_path: string;
   host_verification_submitted_at: string | null;
+  is_blocked: boolean;
+  blocked_reason: string;
+  blocked_at: string | null;
   created_at: string;
 }
 
@@ -196,6 +199,9 @@ export const parseProfile = (raw: Record<string, unknown>): UserProfile => ({
   host_verification_submitted_at: raw.host_verification_submitted_at
     ? String(raw.host_verification_submitted_at)
     : null,
+  is_blocked: Boolean(raw.is_blocked ?? false),
+  blocked_reason: String(raw.blocked_reason ?? ''),
+  blocked_at: raw.blocked_at ? String(raw.blocked_at) : null,
   created_at: String(raw.created_at ?? ''),
 });
 

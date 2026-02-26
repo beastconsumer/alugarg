@@ -17,6 +17,9 @@ const seedOwners: UserProfile[] = [
     host_document_front_path: '',
     host_document_back_path: '',
     host_verification_submitted_at: null,
+    is_blocked: false,
+    blocked_reason: '',
+    blocked_at: null,
     created_at: nowIso,
   },
   {
@@ -33,6 +36,9 @@ const seedOwners: UserProfile[] = [
     host_document_front_path: '',
     host_document_back_path: '',
     host_verification_submitted_at: null,
+    is_blocked: false,
+    blocked_reason: '',
+    blocked_at: null,
     created_at: nowIso,
   },
 ];
