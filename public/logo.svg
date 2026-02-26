@@ -1,0 +1,55 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0ea5e9"/>
+      <stop offset="50%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+    <linearGradient id="waveGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#06b6d4"/>
+      <stop offset="100%" stop-color="#0ea5e9"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="20" flood-color="#3b82f6" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="240" fill="url(#bgGradient)" filter="url(#shadow)"/>
+
+  <!-- House roof -->
+  <path
+    d="M256 100L120 210V220H392V210L256 100Z"
+    fill="white"
+    opacity="0.95"
+  />
+
+  <!-- House body -->
+  <rect x="150" y="220" width="204" height="150" rx="8" fill="white" opacity="0.95"/>
+
+  <!-- Door -->
+  <rect x="220" y="265" width="72" height="105" rx="6" fill="url(#bgGradient)" opacity="0.85"/>
+
+  <!-- Door handle -->
+  <circle cx="280" cy="320" r="6" fill="white" opacity="0.9"/>
+
+  <!-- Window left -->
+  <rect x="162" y="245" width="44" height="44" rx="6" fill="url(#bgGradient)" opacity="0.6"/>
+  <line x1="184" y1="245" x2="184" y2="289" stroke="white" stroke-width="3" opacity="0.5"/>
+  <line x1="162" y1="267" x2="206" y2="267" stroke="white" stroke-width="3" opacity="0.5"/>
+
+  <!-- Window right -->
+  <rect x="306" y="245" width="44" height="44" rx="6" fill="url(#bgGradient)" opacity="0.6"/>
+  <line x1="328" y1="245" x2="328" y2="289" stroke="white" stroke-width="3" opacity="0.5"/>
+  <line x1="306" y1="267" x2="350" y2="267" stroke="white" stroke-width="3" opacity="0.5"/>
+
+  <!-- Wave decoration (representing "Sul" / southern coast) -->
+  <path
+    d="M90 400C130 380 180 420 256 400C332 380 382 420 422 400"
+    stroke="url(#waveGradient)"
+    stroke-width="16"
+    stroke-linecap="round"
+    fill="none"
+    opacity="0.9"
+  />
+</svg>

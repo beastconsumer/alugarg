@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Dark navy background matching the logo -->
+    <item>
+        <color android:color="@color/splashBackground"/>
+    </item>
+    <!-- Centered logo -->
+    <item
+        android:width="200dp"
+        android:height="200dp"
+        android:gravity="center">
+        <bitmap
+            android:src="@drawable/logoapp"
+            android:gravity="center"/>
+    </item>
+</layer-list>
