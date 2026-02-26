@@ -1,21 +1,42 @@
+import { useEffect, useRef, useState } from 'react';
 import { Box, Container, Paper, Text, ThemeIcon, UnstyledButton } from '@mantine/core';
-import { Home, MapPin, MessageSquareText, User } from 'lucide-react';
+import { CalendarCheck2, Home, MapPin, MessageSquareText, User } from 'lucide-react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { usePushNotifications } from '../hooks/usePushNotifications';
 
 const navItems = [
-  { to: '/app/home', label: 'Home', icon: Home },
-  { to: '/app/map', label: 'Mapa', icon: MapPin },
-  { to: '/app/chat', label: 'Chat', icon: MessageSquareText },
-  { to: '/app/profile', label: 'Perfil', icon: User },
+  { to: '/app/home',     label: 'Home',     icon: Home },
+  { to: '/app/map',      label: 'Mapa',     icon: MapPin },
+  { to: '/app/bookings', label: 'Reservas', icon: CalendarCheck2 },
+  { to: '/app/chat',     label: 'Chat',     icon: MessageSquareText },
+  { to: '/app/profile',  label: 'Perfil',   icon: User },
 ];
 
 export function AppShell() {
   const location = useLocation();
+  const [progressKey, setProgressKey] = useState<number | null>(null);
+  const prevKey = useRef(location.key);
+  usePushNotifications();
+
+  useEffect(() => {
+    if (location.key !== prevKey.current) {
+      prevKey.current = location.key;
+      setProgressKey(Date.now());
+      const timer = setTimeout(() => setProgressKey(null), 650);
+      return () => clearTimeout(timer);
+    }
+  }, [location.key]);
 
   return (
     <Box className="app-layout">
+      {/* Top progress bar on navigation */}
+      {progressKey !== null ? <div key={progressKey} className="route-progress-bar" /> : null}
+
       <Container size="lg" className="app-content">
-        <Outlet />
+        {/* Fade-in wrapper resets on each route */}
+        <div key={location.key} className="page-enter">
+          <Outlet />
+        </div>
       </Container>
 
       <Paper className="bottom-nav" radius="xl" shadow="xl" withBorder>

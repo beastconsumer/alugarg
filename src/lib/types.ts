@@ -23,6 +23,7 @@ export interface Property {
   description: string;
   price: number;
   rent_type: RentType;
+  rent_types?: RentType[];
   bedrooms: number;
   bathrooms: number;
   garage_spots: number;
@@ -100,6 +101,22 @@ export interface OwnerReview {
   created_at: string;
 }
 
+export type SupportTicketStatus = 'open' | 'in_progress' | 'resolved' | 'closed';
+
+export interface SupportTicket {
+  id: string;
+  user_id: string;
+  category: string;
+  subject: string;
+  message: string;
+  status: SupportTicketStatus;
+  admin_note: string;
+  assigned_admin_id: string | null;
+  created_at: string;
+  updated_at: string;
+  resolved_at: string | null;
+}
+
 export type ChatConversationStatus = 'open' | 'closed' | 'blocked';
 
 export interface ChatConversation {
@@ -150,13 +167,41 @@ export const parseLocation = (raw: unknown): PropertyLocation => {
   };
 };
 
+const sanitizeRentTypes = (rawRentTypes: unknown, fallback: RentType): RentType[] => {
+  const parsed = Array.isArray(rawRentTypes)
+    ? rawRentTypes
+        .map((item) => String(item) as RentType)
+        .filter((item) => item === 'mensal' || item === 'temporada' || item === 'diaria')
+    : [];
+
+  if (parsed.length > 0) {
+    return Array.from(new Set(parsed));
+  }
+
+  return [fallback];
+};
+
+const coerceRentType = (rawRentType: unknown): RentType => {
+  const value = String(rawRentType ?? 'mensal');
+  if (value === 'diaria' || value === 'temporada' || value === 'mensal') return value;
+  return 'mensal';
+};
+
 export const parseProperty = (raw: Record<string, unknown>): Property => ({
   id: String(raw.id ?? ''),
   owner_id: String(raw.owner_id ?? ''),
   title: String(raw.title ?? ''),
   description: String(raw.description ?? ''),
   price: Number(raw.price ?? 0),
-  rent_type: (String(raw.rent_type ?? 'mensal') as RentType),
+  rent_type: (() => {
+    const fallback = coerceRentType(raw.rent_type);
+    const rentTypes = sanitizeRentTypes(raw.rent_types, fallback);
+    return rentTypes[0] ?? fallback;
+  })(),
+  rent_types: (() => {
+    const fallback = coerceRentType(raw.rent_type);
+    return sanitizeRentTypes(raw.rent_types, fallback);
+  })(),
   bedrooms: Number(raw.bedrooms ?? 0),
   bathrooms: Number(raw.bathrooms ?? 0),
   garage_spots: Number(raw.garage_spots ?? 0),
@@ -255,5 +300,19 @@ export const parseChatMessage = (raw: Record<string, unknown>): ChatMessage => (
   message_text: String(raw.message_text ?? ''),
   is_system: Boolean(raw.is_system ?? false),
   created_at: String(raw.created_at ?? ''),
+});
+
+export const parseSupportTicket = (raw: Record<string, unknown>): SupportTicket => ({
+  id: String(raw.id ?? ''),
+  user_id: String(raw.user_id ?? ''),
+  category: String(raw.category ?? 'geral'),
+  subject: String(raw.subject ?? ''),
+  message: String(raw.message ?? ''),
+  status: (String(raw.status ?? 'open') as SupportTicketStatus),
+  admin_note: String(raw.admin_note ?? ''),
+  assigned_admin_id: raw.assigned_admin_id ? String(raw.assigned_admin_id) : null,
+  created_at: String(raw.created_at ?? ''),
+  updated_at: String(raw.updated_at ?? ''),
+  resolved_at: raw.resolved_at ? String(raw.resolved_at) : null,
 });
 

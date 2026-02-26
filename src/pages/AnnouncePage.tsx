@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ActionIcon,
@@ -9,6 +8,7 @@ import {
   Button,
   Card,
   Checkbox,
+  Divider,
   FileInput,
   Group,
   MultiSelect,
@@ -23,17 +23,34 @@ import {
   Textarea,
   Title,
 } from '@mantine/core';
-import { ImagePlus, Star, Trash2 } from 'lucide-react';
-import UseAnimations from 'react-useanimations';
-import alertCircleAnimated from 'react-useanimations/lib/alertCircle';
-import checkmarkAnimated from 'react-useanimations/lib/checkmark';
-import infoAnimated from 'react-useanimations/lib/info';
+import {
+  AlertCircle,
+  BadgeCheck,
+  BedDouble,
+  Building2,
+  CheckCircle2,
+  ChevronRight,
+  Clock3,
+  FileCheck2,
+  Home,
+  ImagePlus,
+  Info,
+  MapPin,
+  Shield,
+  Star,
+  Trash2,
+} from 'lucide-react';
 import { useAuth } from '../state/AuthContext';
 import { env } from '../env';
 import { formatDate } from '../lib/format';
 import { formatCep, isValidCep, resolveLocationFromCepAddress, sanitizeCep } from '../lib/location';
-import { uploadImageAndGetPublicUrl, uploadPrivateDocumentAndGetPath, supabase } from '../lib/supabase';
-import { amenityOptions } from '../lib/propertyCatalog';
+import {
+  removePrivateDocumentByRef,
+  uploadImageAndGetPublicUrl,
+  uploadPrivateDocumentAndGetPath,
+  supabase,
+} from '../lib/supabase';
+import { amenityOptions, getAmenityLabel } from '../lib/propertyCatalog';
 import { RentType } from '../lib/types';
 
 interface DraftPhoto {
@@ -97,7 +114,7 @@ export function AnnouncePage() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState<number | ''>('');
-  const [rentType, setRentType] = useState<RentType>('mensal');
+  const [rentTypes, setRentTypes] = useState<RentType[]>(['mensal']);
   const [bedrooms, setBedrooms] = useState(1);
   const [bathrooms, setBathrooms] = useState(1);
   const [garageSpots, setGarageSpots] = useState(0);
@@ -114,12 +131,14 @@ export function AnnouncePage() {
   const [smokingAllowed, setSmokingAllowed] = useState(false);
   const [eventsAllowed, setEventsAllowed] = useState(false);
   const [amenities, setAmenities] = useState<string[]>([]);
+  const [amenitySearch, setAmenitySearch] = useState('');
   const [houseRules, setHouseRules] = useState('');
 
   const [addressText, setAddressText] = useState('');
   const [cep, setCep] = useState('');
 
   const [photos, setPhotos] = useState<DraftPhoto[]>([]);
+  const [publishSuccessMessage, setPublishSuccessMessage] = useState('');
 
   const hostStatus = profile?.host_verification_status ?? 'not_started';
   const hasDocuments = Boolean(
@@ -182,11 +201,29 @@ export function AnnouncePage() {
     });
   };
 
+  const primaryRentType = rentTypes[0] ?? 'mensal';
+
+  const toggleAmenity = (value: string) => {
+    setAmenities((current) => {
+      if (current.includes(value)) {
+        return current.filter((item) => item !== value);
+      }
+      return [...current, value];
+    });
+  };
+
+  const filteredAmenityOptions = useMemo(() => {
+    const query = amenitySearch.trim().toLowerCase();
+    if (!query) return amenityOptions;
+    return amenityOptions.filter((option) => option.label.toLowerCase().includes(query));
+  }, [amenitySearch]);
+
   const canGoNext = useMemo(() => {
     if (step === 0) {
       return (
         title.trim().length > 3 &&
         Number(price) > 0 &&
+        rentTypes.length > 0 &&
         description.trim().length > 10 &&
         guestsCapacity >= 1 &&
         minimumNights >= 1
@@ -198,7 +235,7 @@ export function AnnouncePage() {
     }
 
     return true;
-  }, [addressText, description, guestsCapacity, minimumNights, price, step, title]);
+  }, [addressText, description, guestsCapacity, minimumNights, price, rentTypes.length, step, title]);
 
   const getFileExtension = (file: File): string => {
     const fromName = file.name.split('.').pop()?.toLowerCase() ?? '';
@@ -216,10 +253,7 @@ export function AnnouncePage() {
         URL.revokeObjectURL(documentFrontPreviewUrl);
         setDocumentFrontPreviewUrl('');
       }
-      if (!file) {
-        setDocumentFront(null);
-        return;
-      }
+      if (!file) { setDocumentFront(null); return; }
       const validationError = validateDocumentFile(file, 'Frente');
       if (validationError) {
         setDocumentFront(null);
@@ -237,10 +271,7 @@ export function AnnouncePage() {
       URL.revokeObjectURL(documentBackPreviewUrl);
       setDocumentBackPreviewUrl('');
     }
-    if (!file) {
-      setDocumentBack(null);
-      return;
-    }
+    if (!file) { setDocumentBack(null); return; }
     const validationError = validateDocumentFile(file, 'Verso');
     if (validationError) {
       setDocumentBack(null);
@@ -252,11 +283,7 @@ export function AnnouncePage() {
   };
 
   const submitHostDocuments = async () => {
-    if (!user) {
-      setErrorMessage('Sessao expirada. Entre novamente.');
-      return;
-    }
-
+    if (!user) { setErrorMessage('Sessao expirada. Entre novamente.'); return; }
     setDocumentSuccessMessage('');
     setDocumentFrontError('');
     setDocumentBackError('');
@@ -283,25 +310,26 @@ export function AnnouncePage() {
 
     setSubmittingDocuments(true);
     setErrorMessage('');
-
-    let frontPath = '';
-    let backPath = '';
+    let frontStoragePath = '';
+    let backStoragePath = '';
+    let frontStoredRef = '';
+    let backStoredRef = '';
 
     try {
       const stamp = Date.now();
-      frontPath = `${user.id}/host-documents/${stamp}-front.${getFileExtension(documentFront)}`;
-      backPath = `${user.id}/host-documents/${stamp}-back.${getFileExtension(documentBack)}`;
+      frontStoragePath = `${user.id}/host-documents/${stamp}-front.${getFileExtension(documentFront)}`;
+      backStoragePath = `${user.id}/host-documents/${stamp}-back.${getFileExtension(documentBack)}`;
 
-      await uploadPrivateDocumentAndGetPath(documentFront, frontPath);
-      await uploadPrivateDocumentAndGetPath(documentBack, backPath);
+      frontStoredRef = await uploadPrivateDocumentAndGetPath(documentFront, frontStoragePath);
+      backStoredRef = await uploadPrivateDocumentAndGetPath(documentBack, backStoragePath);
 
       const { error } = await supabase
         .from('users')
         .update({
           host_verification_status: 'pending',
           host_document_type: documentType,
-          host_document_front_path: frontPath,
-          host_document_back_path: backPath,
+          host_document_front_path: frontStoredRef,
+          host_document_back_path: backStoredRef,
           host_verification_submitted_at: new Date().toISOString(),
         })
         .eq('id', user.id);
@@ -311,33 +339,25 @@ export function AnnouncePage() {
       await refreshProfile();
       setDocumentFront(null);
       setDocumentBack(null);
-      if (documentFrontPreviewUrl) {
-        URL.revokeObjectURL(documentFrontPreviewUrl);
-        setDocumentFrontPreviewUrl('');
-      }
-      if (documentBackPreviewUrl) {
-        URL.revokeObjectURL(documentBackPreviewUrl);
-        setDocumentBackPreviewUrl('');
-      }
+      if (documentFrontPreviewUrl) { URL.revokeObjectURL(documentFrontPreviewUrl); setDocumentFrontPreviewUrl(''); }
+      if (documentBackPreviewUrl) { URL.revokeObjectURL(documentBackPreviewUrl); setDocumentBackPreviewUrl(''); }
       setDocumentSuccessMessage('Documentos enviados com sucesso. Sua analise ja foi iniciada.');
       setForceDocUpload(false);
       setAcceptHostRules(false);
     } catch (error) {
-      if (frontPath || backPath) {
-        await supabase.storage
-          .from('host-documents')
-          .remove([frontPath, backPath].filter(Boolean))
-          .catch(() => null);
-      }
+      await Promise.all([
+        removePrivateDocumentByRef(frontStoredRef),
+        removePrivateDocumentByRef(backStoredRef),
+      ]);
       const message = error instanceof Error ? error.message : 'Falha ao enviar documentos';
       if (message.toLowerCase().includes('bucket')) {
-        setErrorMessage('Bucket host-documents nao encontrado no Supabase Storage.');
+        setErrorMessage('Nao foi possivel enviar os documentos no momento. Verifique a configuracao do Storage no Supabase.');
       } else if (message.toLowerCase().includes('row level security') || message.toLowerCase().includes('permission')) {
         setErrorMessage('Sem permissao para enviar documentos. Entre novamente e tente de novo.');
       } else if (message.toLowerCase().includes('mime') || message.toLowerCase().includes('content-type')) {
         setErrorMessage('Formato invalido. Envie JPG, PNG ou WEBP com boa qualidade.');
       } else if (message.toLowerCase().includes('network') || message.toLowerCase().includes('failed to fetch')) {
-        setErrorMessage('Falha de rede ao enviar documentos. Verifique sua internet e tente novamente.');
+        setErrorMessage('Falha de rede. Verifique sua internet e tente novamente.');
       } else {
         setErrorMessage(message);
       }
@@ -347,23 +367,13 @@ export function AnnouncePage() {
   };
 
   const publishProperty = async () => {
-    if (!user) {
-      setErrorMessage('Sessao expirada. Entre novamente.');
-      return;
-    }
-
-    if (!isVerifiedHost) {
-      setErrorMessage('Aguarde a confirmacao dos documentos antes de anunciar.');
-      return;
-    }
-
-    if (photos.length < 3) {
-      setErrorMessage('Selecione pelo menos 3 fotos.');
-      return;
-    }
+    if (!user) { setErrorMessage('Sessao expirada. Entre novamente.'); return; }
+    if (!isVerifiedHost) { setErrorMessage('Aguarde a confirmacao dos documentos antes de anunciar.'); return; }
+    if (photos.length < 3) { setErrorMessage('Selecione pelo menos 3 fotos.'); return; }
 
     setLoading(true);
     setErrorMessage('');
+    setPublishSuccessMessage('');
 
     try {
       const uploadedUrls: string[] = [];
@@ -384,7 +394,8 @@ export function AnnouncePage() {
         title: title.trim(),
         description: description.trim(),
         price: Number(price),
-        rent_type: rentType,
+        rent_type: primaryRentType,
+        rent_types: rentTypes,
         bedrooms,
         bathrooms,
         garage_spots: garageSpots,
@@ -414,7 +425,8 @@ export function AnnouncePage() {
       });
 
       if (error) throw error;
-      navigate('/app/profile', { replace: true });
+      setPublishSuccessMessage('Anuncio enviado para revisao com sucesso. Ele aparecera no app apos aprovacao do admin.');
+      setTimeout(() => navigate('/app/profile', { replace: true }), 1200);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Falha ao publicar anuncio';
       if (message.toLowerCase().includes('bucket')) {
@@ -427,542 +439,540 @@ export function AnnouncePage() {
     }
   };
 
+  // ── Host not yet verified — Verification flow ──────────────────
   if (!isVerifiedHost) {
     return (
-      <Stack gap="md" py="md">
-        <Card withBorder radius="xl" p="lg" className="host-hero-card">
-          <Stack gap={6}>
-            <Badge color="dark" variant="light">
-              Anfitriao AlugaSul
-            </Badge>
-            <Title order={2} className="host-hero-title">
-              Que legal que voce quer se tornar um anfitriao.
-            </Title>
-            <Text c="dimmed">
-              Vamos seguir um passo a passo simples: enviar documentos, aguardar confirmacao e depois cadastrar sua casa.
+      <Stack gap="lg" py="md">
+        {/* Hero */}
+        <div className="announce-hero">
+          <div className="announce-hero-icon">
+            <Home size={28} />
+          </div>
+          <div>
+            <Title order={2} className="announce-hero-title">Seja um anfitriao AlugaSul</Title>
+            <Text c="dimmed" size="sm" mt={2}>
+              Anuncie seu imovel, receba hospedes e gere renda com total seguranca.
             </Text>
-          </Stack>
-        </Card>
+          </div>
+        </div>
 
-        <Card withBorder radius="xl" p="lg" className="host-onboard-card">
-          <Stack gap="lg">
-            <Stack gap="xs">
-              <Title order={4}>Sua jornada de anfitriao</Title>
-              <Text size="sm" c="dimmed">
-                Cada etapa libera a proxima. Assim garantimos seguranca e qualidade para todos.
-              </Text>
-            </Stack>
-
-            <Stepper active={hostJourneyStep} allowNextStepsSelect={false} iconPosition="left">
-              <Stepper.Step label="Enviar documentos" description="RG ou CNH frente e verso" />
-              <Stepper.Step label="Aguardar confirmacao" description="Analise da equipe" />
-              <Stepper.Step label="Cadastrar a casa" description="Complete o anuncio" />
+        {/* Journey stepper */}
+        <Card withBorder radius="xl" p="lg">
+          <Stack gap="md">
+            <Text fw={700} size="sm">Sua jornada</Text>
+            <Stepper active={hostJourneyStep} allowNextStepsSelect={false} iconPosition="left" size="sm">
+              <Stepper.Step label="Documentos" description="RG ou CNH" />
+              <Stepper.Step label="Analise" description="Ate 24h uteis" />
+              <Stepper.Step label="Publicar" description="Cadastre a casa" />
             </Stepper>
-
-            <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="sm">
-              <motion.div whileHover={{ y: -2 }} transition={{ duration: 0.16 }}>
-                <Card withBorder radius="lg" p="md" className="host-step-card">
-                  <Group gap="sm" wrap="nowrap">
-                    <div className="host-step-index">1</div>
-                    <div>
-                      <Group gap={6} align="center">
-                        <UseAnimations animation={checkmarkAnimated} size={16} strokeColor="#0f766e" autoplay />
-                        <Text fw={700}>Documento valido</Text>
-                      </Group>
-                      <Text size="sm" c="dimmed">RG ou CNH com foto legivel.</Text>
-                    </div>
-                  </Group>
-                </Card>
-              </motion.div>
-
-              <motion.div whileHover={{ y: -2 }} transition={{ duration: 0.16 }}>
-                <Card withBorder radius="lg" p="md" className="host-step-card">
-                  <Group gap="sm" wrap="nowrap">
-                    <div className="host-step-index">2</div>
-                    <div>
-                      <Group gap={6} align="center">
-                        <UseAnimations animation={alertCircleAnimated} size={16} strokeColor="#b45309" autoplay />
-                        <Text fw={700}>Fotos nitidas</Text>
-                      </Group>
-                      <Text size="sm" c="dimmed">Sem reflexo, sem cortes e sem filtro.</Text>
-                    </div>
-                  </Group>
-                </Card>
-              </motion.div>
-
-              <motion.div whileHover={{ y: -2 }} transition={{ duration: 0.16 }}>
-                <Card withBorder radius="lg" p="md" className="host-step-card">
-                  <Group gap="sm" wrap="nowrap">
-                    <div className="host-step-index">3</div>
-                    <div>
-                      <Group gap={6} align="center">
-                        <UseAnimations animation={infoAnimated} size={16} strokeColor="#1f5ed6" autoplay />
-                        <Text fw={700}>Confirmacao e anuncio</Text>
-                      </Group>
-                      <Text size="sm" c="dimmed">Validacao em ate 24h uteis.</Text>
-                    </div>
-                  </Group>
-                </Card>
-              </motion.div>
-            </SimpleGrid>
           </Stack>
         </Card>
 
+        {/* Pending state */}
         {isPendingHost && !forceDocUpload ? (
-          <Card withBorder radius="xl" p="lg" className="host-waiting-card">
-            <Stack gap="sm">
-              <Group justify="space-between" wrap="wrap">
-                <Stack gap={2}>
-                  <Group gap={8}>
-                    <UseAnimations animation={checkmarkAnimated} size={20} strokeColor="#0f766e" autoplay />
-                    <Title order={4} className="host-hero-title">
-                      Documentos recebidos
-                    </Title>
-                  </Group>
+          <Card withBorder radius="xl" p="lg" className="announce-pending-card">
+            <Group justify="space-between" align="flex-start" wrap="nowrap">
+              <Group gap="sm" align="flex-start" wrap="nowrap">
+                <div className="announce-status-icon announce-status-icon--pending">
+                  <CheckCircle2 size={20} />
+                </div>
+                <Stack gap={3}>
+                  <Text fw={700}>Documentos recebidos</Text>
                   <Text size="sm" c="dimmed">
-                    Estamos analisando sua identidade. Em breve liberamos o cadastro do imovel.
+                    Analise em andamento. Em breve voce podera cadastrar seu imovel.
                   </Text>
+                  {profile?.host_verification_submitted_at ? (
+                    <Text size="xs" c="dimmed">
+                      Enviado em {formatDate(profile.host_verification_submitted_at)}
+                    </Text>
+                  ) : null}
                 </Stack>
-                <Badge color="yellow" variant="light">
-                  Em analise
-                </Badge>
               </Group>
-              <Text size="sm" c="dimmed">
-                Enviado em {profile?.host_verification_submitted_at ? formatDate(profile.host_verification_submitted_at) : 'data indefinida'}.
-              </Text>
-              <Alert color="blue" variant="light">
-                Assim que a verificacao for aprovada, voce podera cadastrar sua casa e publicar o anuncio.
-              </Alert>
+              <Badge color="yellow" variant="light" radius="xl" style={{ flexShrink: 0 }}>Em analise</Badge>
+            </Group>
+
+            <Button
+              variant="subtle"
+              size="xs"
+              mt="md"
+              onClick={() => { setErrorMessage(''); setDocumentSuccessMessage(''); setForceDocUpload(true); }}
+            >
+              Reenviar documentos
+            </Button>
+          </Card>
+        ) : null}
+
+        {/* Rejected state */}
+        {isRejectedHost && !forceDocUpload ? (
+          <Alert color="red" radius="xl" icon={<AlertCircle size={16} />}>
+            Seus documentos foram recusados. Envie novas fotos nítidas para continuar.
+          </Alert>
+        ) : null}
+
+        {/* Document upload form */}
+        {showDocumentForm ? (
+          <Card withBorder radius="xl" p="lg">
+            <Stack gap="lg">
+
+              {/* Form header */}
+              <Stack gap={4}>
+                <Group gap="sm">
+                  <div className="announce-step-badge">
+                    <Shield size={15} />
+                  </div>
+                  <Text fw={700}>Verificacao de identidade</Text>
+                </Group>
+                <Text size="sm" c="dimmed">
+                  Envie uma foto da frente e do verso do seu {documentType === 'rg' ? 'RG' : 'CNH'} para validarmos sua conta.
+                </Text>
+              </Stack>
+
+              {documentSuccessMessage ? (
+                <Alert color="teal" radius="xl" icon={<CheckCircle2 size={16} />}>
+                  {documentSuccessMessage}
+                </Alert>
+              ) : null}
+
+              {/* Document type */}
+              <Select
+                label="Tipo de documento"
+                data={[
+                  { value: 'rg', label: 'RG — Registro Geral' },
+                  { value: 'cnh', label: 'CNH — Carteira de Habilitacao' },
+                ]}
+                value={documentType}
+                onChange={(value) => setDocumentType((value as 'rg' | 'cnh') || 'rg')}
+              />
+
+              {/* Dicas rápidas */}
+              <div className="announce-tips-row">
+                <div className="announce-tip">
+                  <Info size={13} style={{ flexShrink: 0, color: '#1f5ed6' }} />
+                  <Text size="xs">Foto original da camera — sem print de tela</Text>
+                </div>
+                <div className="announce-tip">
+                  <Info size={13} style={{ flexShrink: 0, color: '#1f5ed6' }} />
+                  <Text size="xs">Sem reflexo, sombra ou desfoque</Text>
+                </div>
+                <div className="announce-tip">
+                  <Info size={13} style={{ flexShrink: 0, color: '#1f5ed6' }} />
+                  <Text size="xs">JPG, PNG ou WEBP — max 12 MB</Text>
+                </div>
+              </div>
+
+              {/* File uploads */}
+              <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+                <Stack gap="xs">
+                  <FileInput
+                    label="Frente do documento"
+                    value={documentFront}
+                    onChange={(file) => onChangeDocumentFile('front', file)}
+                    accept="image/*"
+                    error={documentFrontError || undefined}
+                    required
+                  />
+                  {documentFrontPreviewUrl ? (
+                    <div className="announce-doc-preview-wrap">
+                      <img src={documentFrontPreviewUrl} alt="Frente" className="announce-doc-preview" />
+                      <button type="button" className="announce-doc-remove" onClick={() => onChangeDocumentFile('front', null)}>
+                        ✕
+                      </button>
+                    </div>
+                  ) : null}
+                  {documentFront && !documentFrontPreviewUrl ? (
+                    <Text size="xs" c="dimmed">{documentFront.name} ({formatFileSize(documentFront.size)})</Text>
+                  ) : null}
+                </Stack>
+
+                <Stack gap="xs">
+                  <FileInput
+                    label="Verso do documento"
+                    value={documentBack}
+                    onChange={(file) => onChangeDocumentFile('back', file)}
+                    accept="image/*"
+                    error={documentBackError || undefined}
+                    required
+                  />
+                  {documentBackPreviewUrl ? (
+                    <div className="announce-doc-preview-wrap">
+                      <img src={documentBackPreviewUrl} alt="Verso" className="announce-doc-preview" />
+                      <button type="button" className="announce-doc-remove" onClick={() => onChangeDocumentFile('back', null)}>
+                        ✕
+                      </button>
+                    </div>
+                  ) : null}
+                  {documentBack && !documentBackPreviewUrl ? (
+                    <Text size="xs" c="dimmed">{documentBack.name} ({formatFileSize(documentBack.size)})</Text>
+                  ) : null}
+                </Stack>
+              </SimpleGrid>
+
+              {hasDocuments ? (
+                <Text size="xs" c="dimmed">
+                  Ultimo envio: {submittedDocumentTypeLabel} em{' '}
+                  {profile?.host_verification_submitted_at ? formatDate(profile.host_verification_submitted_at) : '—'}
+                </Text>
+              ) : null}
+
+              <Divider />
+
+              {/* Rules + acceptance */}
+              <Stack gap="sm">
+                <Text fw={700} size="sm">Regras do anfitriao</Text>
+                <div className="announce-rules-list">
+                  <div className="announce-rule-item">
+                    <ChevronRight size={13} style={{ color: '#1f5ed6', flexShrink: 0 }} />
+                    <Text size="sm">Respeitar as regras de condominio e vizinhanca.</Text>
+                  </div>
+                  <div className="announce-rule-item">
+                    <ChevronRight size={13} style={{ color: '#1f5ed6', flexShrink: 0 }} />
+                    <Text size="sm">Manter o anuncio atualizado com fotos reais.</Text>
+                  </div>
+                  <div className="announce-rule-item">
+                    <ChevronRight size={13} style={{ color: '#1f5ed6', flexShrink: 0 }} />
+                    <Text size="sm">Responder mensagens em tempo razoavel.</Text>
+                  </div>
+                  <div className="announce-rule-item">
+                    <ChevronRight size={13} style={{ color: '#1f5ed6', flexShrink: 0 }} />
+                    <Text size="sm">Oferecer check-in claro e seguro ao hospede.</Text>
+                  </div>
+                </div>
+
+                <Checkbox
+                  label="Li e aceito as regras para anunciar no AlugaSul"
+                  checked={acceptHostRules}
+                  onChange={(event) => setAcceptHostRules(event.currentTarget.checked)}
+                />
+
+                <Text size="xs" c="dimmed">
+                  Ao enviar, voce concorda com os{' '}
+                  <Anchor component={Link} to="/termos-de-uso" fw={700}>Termos de Uso</Anchor>{' '}
+                  e com a{' '}
+                  <Anchor component={Link} to="/politica-de-privacidade" fw={700}>Politica de Privacidade</Anchor>.
+                </Text>
+              </Stack>
+
+              {errorMessage ? <Alert color="red" radius="xl">{errorMessage}</Alert> : null}
+
               <Button
-                variant="default"
-                onClick={() => {
-                  setErrorMessage('');
-                  setDocumentSuccessMessage('');
-                  setForceDocUpload(true);
-                }}
+                loading={submittingDocuments}
+                disabled={!canSubmitDocuments}
+                onClick={() => void submitHostDocuments()}
+                radius="xl"
+                fullWidth
+                leftSection={<FileCheck2 size={16} />}
               >
-                Reenviar documentos
+                Enviar documentos
               </Button>
             </Stack>
           </Card>
         ) : null}
 
-        {showDocumentForm ? (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.24, ease: 'easeOut' }}
-          >
-          <Card withBorder radius="xl" p="lg" className="host-onboard-card">
-            <Stack gap="lg">
-              <Stack gap={6}>
-                <Group gap={8}>
-                  <UseAnimations animation={alertCircleAnimated} size={20} strokeColor="#1f5ed6" autoplay />
-                  <Title order={4}>Antes de anunciar, precisamos validar sua identidade</Title>
-                </Group>
-                <Text c="dimmed">
-                  Isso ajuda a manter a plataforma segura para hospedes e anfitrioes.
-                </Text>
-              </Stack>
-
-              {isRejectedHost ? (
-                <Alert color="red" variant="light">
-                  Seus documentos foram recusados. Envie novas fotos nítidas para continuar.
-                </Alert>
-              ) : null}
-
-              <Card withBorder radius="lg" p="md" className="host-onboard-rules">
-                <Stack gap="xs">
-                  <Text fw={700}>Regras do anfitriao</Text>
-                  <Text size="sm" c="dimmed">
-                    Ao anunciar, voce concorda com:
-                  </Text>
-                  <ul className="host-onboard-list">
-                    <li>Respeitar as regras de condominio e vizinhanca.</li>
-                    <li>Manter o anuncio atualizado com fotos reais.</li>
-                    <li>Responder mensagens em tempo razoavel.</li>
-                    <li>Oferecer check-in claro e seguro.</li>
-                  </ul>
-                </Stack>
-              </Card>
-
-              <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
-                <Select
-                  label="Documento"
-                  description="Escolha o documento que voce vai enviar agora."
-                  data={[
-                    { value: 'rg', label: 'RG' },
-                    { value: 'cnh', label: 'CNH' },
-                  ]}
-                  value={documentType}
-                  onChange={(value) => setDocumentType((value as 'rg' | 'cnh') || 'rg')}
-                  required
-                />
-
-                <Checkbox
-                  label="Li e aceito as regras para anunciar"
-                  checked={acceptHostRules}
-                  onChange={(event) => setAcceptHostRules(event.currentTarget.checked)}
-                />
-              </SimpleGrid>
-
-              <Text size="xs" c="dimmed">
-                Ao enviar documentos, voce concorda com os{' '}
-                <Anchor component={Link} to="/termos-de-uso" fw={700}>
-                  Termos de Uso
-                </Anchor>{' '}
-                e com a{' '}
-                <Anchor component={Link} to="/politica-de-privacidade" fw={700}>
-                  Politica de Privacidade
-                </Anchor>
-                .
-              </Text>
-
-              <Card withBorder radius="lg" p="md" className="host-onboard-rules">
-                <Stack gap={4}>
-                  <Group gap={8}>
-                    <UseAnimations animation={infoAnimated} size={18} strokeColor="#1f5ed6" autoplay />
-                    <Text fw={700}>Checklist rapido para aprovacao</Text>
-                  </Group>
-                  <Text size="sm" c="dimmed">
-                    Envie {documentType === 'rg' ? 'RG' : 'CNH'} com boa iluminacao, sem cortes e com dados legiveis.
-                  </Text>
-                  <ul className="host-onboard-list">
-                    <li>Use imagem original da camera, sem print.</li>
-                    <li>Evite reflexo, sombra e desfoque.</li>
-                    <li>Formato aceito: JPG, PNG ou WEBP.</li>
-                    <li>Tamanho maximo por arquivo: 12 MB.</li>
-                  </ul>
-                </Stack>
-              </Card>
-
-              <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
-                <FileInput
-                  label="Documento - frente"
-                  description="JPG, PNG ou WEBP ate 12 MB."
-                  value={documentFront}
-                  onChange={(file) => onChangeDocumentFile('front', file)}
-                  accept="image/*"
-                  required
-                />
-
-                <FileInput
-                  label="Documento - verso"
-                  description="JPG, PNG ou WEBP ate 12 MB."
-                  value={documentBack}
-                  onChange={(file) => onChangeDocumentFile('back', file)}
-                  accept="image/*"
-                  required
-                />
-              </SimpleGrid>
-
-              {(documentFront || documentBack) ? (
-                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
-                  <Card withBorder radius="lg" p="md" className="profile-air-list-card">
-                    <Stack gap={8}>
-                      <Text fw={700}>Frente do documento</Text>
-                      {documentFrontPreviewUrl ? (
-                        <img src={documentFrontPreviewUrl} alt="Preview documento frente" className="host-document-preview" />
-                      ) : null}
-                      <Text size="sm" c="dimmed">
-                        {documentFront ? `${documentFront.name} (${formatFileSize(documentFront.size)})` : 'Nao selecionado'}
-                      </Text>
-                      {documentFront ? (
-                        <Button variant="default" size="xs" onClick={() => onChangeDocumentFile('front', null)}>
-                          Remover frente
-                        </Button>
-                      ) : null}
-                    </Stack>
-                  </Card>
-
-                  <Card withBorder radius="lg" p="md" className="profile-air-list-card">
-                    <Stack gap={8}>
-                      <Text fw={700}>Verso do documento</Text>
-                      {documentBackPreviewUrl ? (
-                        <img src={documentBackPreviewUrl} alt="Preview documento verso" className="host-document-preview" />
-                      ) : null}
-                      <Text size="sm" c="dimmed">
-                        {documentBack ? `${documentBack.name} (${formatFileSize(documentBack.size)})` : 'Nao selecionado'}
-                      </Text>
-                      {documentBack ? (
-                        <Button variant="default" size="xs" onClick={() => onChangeDocumentFile('back', null)}>
-                          Remover verso
-                        </Button>
-                      ) : null}
-                    </Stack>
-                  </Card>
-                </SimpleGrid>
-              ) : null}
-
-              {documentFrontError ? <Alert color="red">{documentFrontError}</Alert> : null}
-              {documentBackError ? <Alert color="red">{documentBackError}</Alert> : null}
-
-              {hasDocuments ? (
-                <Alert color="gray" variant="light">
-                  Ultimo envio: {submittedDocumentTypeLabel} em{' '}
-                  {profile?.host_verification_submitted_at ? formatDate(profile.host_verification_submitted_at) : 'data nao registrada'}.
-                </Alert>
-              ) : null}
-
-              <Alert color="blue" variant="light">
-                As imagens serao armazenadas com acesso privado e usadas apenas na validacao do anfitriao.
-              </Alert>
-
-              {documentSuccessMessage ? <Alert color="teal">{documentSuccessMessage}</Alert> : null}
-              {errorMessage ? <Alert color="red">{errorMessage}</Alert> : null}
-
-              <motion.div whileHover={{ y: -1 }} whileTap={{ scale: 0.99 }}>
-                <Button loading={submittingDocuments} disabled={!canSubmitDocuments} onClick={() => void submitHostDocuments()}>
-                Enviar documentos e continuar
-              </Button>
-              </motion.div>
-            </Stack>
-          </Card>
-          </motion.div>
+        {/* Benefits strip */}
+        {!showDocumentForm ? (
+          <div className="announce-benefits-row">
+            <div className="announce-benefit">
+              <BadgeCheck size={18} style={{ color: '#1f5ed6' }} />
+              <Text size="xs" fw={600}>Verificacao segura</Text>
+            </div>
+            <div className="announce-benefit">
+              <Shield size={18} style={{ color: '#1f5ed6' }} />
+              <Text size="xs" fw={600}>Protecao garantida</Text>
+            </div>
+            <div className="announce-benefit">
+              <CheckCircle2 size={18} style={{ color: '#1f5ed6' }} />
+              <Text size="xs" fw={600}>Suporte dedicado</Text>
+            </div>
+          </div>
         ) : null}
       </Stack>
     );
   }
 
+  // ── Verified host — Property form ──────────────────────────────
   return (
-    <Stack gap="md" py="md">
-      <Card withBorder radius="xl" p="lg">
-        <Stack gap={6}>
-          <Title order={2}>Anunciar imovel</Title>
-          <Text c="dimmed">Fluxo profissional com comodidades, regras e taxas completas.</Text>
-        </Stack>
-      </Card>
+    <Stack gap="lg" py="md">
+      {/* Header */}
+      <div className="announce-hero announce-hero--verified">
+        <div className="announce-hero-icon announce-hero-icon--verified">
+          <BadgeCheck size={26} />
+        </div>
+        <div>
+          <Title order={2} className="announce-hero-title">Cadastrar imovel</Title>
+          <Text c="dimmed" size="sm" mt={2}>Preencha as informacoes e publique seu anuncio para revisao.</Text>
+        </div>
+      </div>
 
       <Card withBorder radius="xl" p="lg">
-        <Stack gap="lg">
-          <Stepper active={step} onStepClick={setStep} allowNextStepsSelect iconPosition="left">
-            <Stepper.Step label="Info" description="Estrutura e politicas" />
-            <Stepper.Step label="Local" description="Endereco e referencia" />
-            <Stepper.Step label="Fotos" description="Galeria do anuncio" />
+        <Stack gap="xl">
+          <Stepper active={step} onStepClick={setStep} allowNextStepsSelect iconPosition="left" size="sm">
+            <Stepper.Step label="Informacoes" description="Dados e estrutura" icon={<Building2 size={14} />} />
+            <Stepper.Step label="Localizacao" description="CEP e endereco" icon={<MapPin size={14} />} />
+            <Stepper.Step label="Fotos" description="Galeria do anuncio" icon={<ImagePlus size={14} />} />
           </Stepper>
 
+          {/* ── STEP 0: Informações ── */}
           {step === 0 ? (
-            <Stack gap="md">
-              <Title order={4}>Dados principais</Title>
-              <TextInput label="Titulo" value={title} onChange={(e) => setTitle(e.currentTarget.value)} required />
-              <Textarea
-                label="Descricao"
-                minRows={4}
-                value={description}
-                onChange={(e) => setDescription(e.currentTarget.value)}
-                required
-              />
-
-              <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
-                <NumberInput
-                  label="Preco base"
-                  min={1}
-                  value={price}
-                  onChange={(value) => setPrice(typeof value === 'number' ? value : '')}
+            <Stack gap="lg">
+              {/* Básico */}
+              <Stack gap="sm">
+                <Text fw={700} size="sm" className="announce-section-label">Sobre o imovel</Text>
+                <TextInput
+                  label="Titulo do anuncio"
+                  placeholder="Ex: Casa de Praia com 3 quartos em Cassino"
+                  value={title}
+                  onChange={(e) => setTitle(e.currentTarget.value)}
                   required
                 />
-                <Select
-                  label="Tipo de aluguel"
-                  data={[
-                    { value: 'mensal', label: 'Mensal' },
-                    { value: 'temporada', label: 'Temporada' },
-                    { value: 'diaria', label: 'Diaria' },
-                  ]}
-                  value={rentType}
-                  onChange={(value) => setRentType((value as RentType) || 'mensal')}
+                <Textarea
+                  label="Descricao"
+                  placeholder="Descreva o imovel: diferenciais, vizinhanca, o que tem por perto..."
+                  minRows={4}
+                  autosize
+                  value={description}
+                  onChange={(e) => setDescription(e.currentTarget.value)}
+                  required
                 />
-              </SimpleGrid>
+              </Stack>
 
-              <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
-                <NumberInput label="Quartos" min={0} value={bedrooms} onChange={(v) => setBedrooms(Number(v) || 0)} />
-                <NumberInput label="Banheiros" min={0} value={bathrooms} onChange={(v) => setBathrooms(Number(v) || 0)} />
-                <NumberInput label="Suites" min={0} value={suites} onChange={(v) => setSuites(Number(v) || 0)} />
-              </SimpleGrid>
-
-              <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
-                <NumberInput
-                  label="Capacidade de hospedes"
-                  min={1}
-                  value={guestsCapacity}
-                  onChange={(v) => setGuestsCapacity(Number(v) || 1)}
-                />
-                <NumberInput
-                  label="Vagas de garagem"
-                  min={0}
-                  value={garageSpots}
-                  onChange={(v) => setGarageSpots(Number(v) || 0)}
-                />
-                <NumberInput label="Area (m2)" min={0} value={areaM2} onChange={(v) => setAreaM2(Number(v) || 0)} />
-              </SimpleGrid>
-
-              <Title order={4}>Comodidades estilo hospedagem premium</Title>
-              <MultiSelect
-                label="Comodidades"
-                placeholder="Selecione comodidades"
-                searchable
-                clearable
-                data={amenityOptions}
-                value={amenities}
-                onChange={setAmenities}
-              />
-
-              <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
-                <Switch
-                  label="Aceita pet"
-                  checked={petFriendly}
-                  onChange={(event) => setPetFriendly(event.currentTarget.checked)}
-                />
-                <Switch
-                  label="Imovel mobiliado"
-                  checked={furnished}
-                  onChange={(event) => setFurnished(event.currentTarget.checked)}
-                />
-                <Switch
-                  label="Permite fumar"
-                  checked={smokingAllowed}
-                  onChange={(event) => setSmokingAllowed(event.currentTarget.checked)}
-                />
-                <Switch
-                  label="Permite eventos"
-                  checked={eventsAllowed}
-                  onChange={(event) => setEventsAllowed(event.currentTarget.checked)}
-                />
-              </SimpleGrid>
-
-              <Title order={4}>Politicas e taxas</Title>
-              <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
-                <NumberInput
-                  label="Minimo de noites"
-                  min={1}
-                  value={minimumNights}
-                  onChange={(v) => setMinimumNights(Number(v) || 1)}
-                />
-                <NumberInput
-                  label="Taxa de limpeza"
-                  min={0}
-                  value={cleaningFee}
-                  onChange={(v) => setCleaningFee(Number(v) || 0)}
-                />
-                <NumberInput
-                  label="Caucao"
-                  min={0}
-                  value={securityDeposit}
-                  onChange={(v) => setSecurityDeposit(Number(v) || 0)}
-                />
-                <SimpleGrid cols={2} spacing="xs">
-                  <TextInput
-                    label="Check-in"
-                    type="time"
-                    value={checkInTime}
-                    onChange={(event) => setCheckInTime(event.currentTarget.value)}
+              {/* Preço */}
+              <Stack gap="sm">
+                <Text fw={700} size="sm" className="announce-section-label">Preco e tipo</Text>
+                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+                  <NumberInput
+                    label="Preco base (R$)"
+                    placeholder="0"
+                    min={1}
+                    value={price}
+                    onChange={(value) => setPrice(typeof value === 'number' ? value : '')}
+                    required
                   />
-                  <TextInput
-                    label="Check-out"
-                    type="time"
-                    value={checkOutTime}
-                    onChange={(event) => setCheckOutTime(event.currentTarget.value)}
+                  <MultiSelect
+                    label="Tipos de aluguel"
+                    placeholder="Selecione um ou mais tipos"
+                    data={[
+                      { value: 'diaria', label: 'Diaria - por noite' },
+                      { value: 'temporada', label: 'Temporada - por periodo' },
+                      { value: 'mensal', label: 'Mensal - por mes' },
+                    ]}
+                    value={rentTypes}
+                    onChange={(value) => {
+                      const normalized = value.filter(
+                        (item): item is RentType => item === 'diaria' || item === 'temporada' || item === 'mensal',
+                      );
+                      setRentTypes(normalized.length > 0 ? normalized : ['mensal']);
+                    }}
+                    required
                   />
                 </SimpleGrid>
-              </SimpleGrid>
+                <Text size="xs" c="dimmed">
+                  O primeiro tipo selecionado sera o principal exibido no card.
+                </Text>
+              </Stack>
 
-              <Textarea
-                label="Regras da casa"
-                minRows={3}
-                placeholder="Ex: sem festas apos 22h, respeito aos vizinhos, etc"
-                value={houseRules}
-                onChange={(event) => setHouseRules(event.currentTarget.value)}
-              />
+              {/* Estrutura */}
+              <Stack gap="sm">
+                <Text fw={700} size="sm" className="announce-section-label">Estrutura</Text>
+                <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="sm">
+                  <NumberInput label="Quartos" min={0} value={bedrooms} onChange={(v) => setBedrooms(Number(v) || 0)} leftSection={<BedDouble size={14} />} />
+                  <NumberInput label="Banheiros" min={0} value={bathrooms} onChange={(v) => setBathrooms(Number(v) || 0)} />
+                  <NumberInput label="Suites" min={0} value={suites} onChange={(v) => setSuites(Number(v) || 0)} />
+                  <NumberInput label="Garagem" min={0} value={garageSpots} onChange={(v) => setGarageSpots(Number(v) || 0)} />
+                </SimpleGrid>
+                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+                  <NumberInput label="Hospedes max." min={1} value={guestsCapacity} onChange={(v) => setGuestsCapacity(Number(v) || 1)} />
+                  <NumberInput label="Area (m²)" min={0} value={areaM2} onChange={(v) => setAreaM2(Number(v) || 0)} />
+                </SimpleGrid>
+              </Stack>
+
+              {/* Comodidades */}
+              <Stack gap="sm">
+                <Text fw={700} size="sm" className="announce-section-label">Comodidades</Text>
+                <TextInput
+                  placeholder="Buscar comodidade"
+                  value={amenitySearch}
+                  onChange={(event) => setAmenitySearch(event.currentTarget.value)}
+                />
+                <Group gap={8} wrap="wrap">
+                  {filteredAmenityOptions.map((option) => {
+                    const selected = amenities.includes(option.value);
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        className={`amenity-tag-btn${selected ? ' selected' : ''}`}
+                        onClick={() => toggleAmenity(option.value)}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </Group>
+                {amenities.length > 0 ? (
+                  <Group gap={6} wrap="wrap">
+                    {amenities.map((item) => (
+                      <Badge key={item} size="sm" radius="xl" variant="light" color="blue">
+                        {getAmenityLabel(item)}
+                      </Badge>
+                    ))}
+                  </Group>
+                ) : (
+                  <Text size="xs" c="dimmed">Nenhuma comodidade selecionada.</Text>
+                )}
+                <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="xs">
+                  <Switch label="Aceita pets" checked={petFriendly} onChange={(e) => setPetFriendly(e.currentTarget.checked)} />
+                  <Switch label="Mobiliado" checked={furnished} onChange={(e) => setFurnished(e.currentTarget.checked)} />
+                  <Switch label="Fumantes" checked={smokingAllowed} onChange={(e) => setSmokingAllowed(e.currentTarget.checked)} />
+                  <Switch label="Eventos" checked={eventsAllowed} onChange={(e) => setEventsAllowed(e.currentTarget.checked)} />
+                </SimpleGrid>
+              </Stack>
+
+              {/* Políticas */}
+              <Stack gap="sm">
+                <Text fw={700} size="sm" className="announce-section-label">Politicas e taxas</Text>
+                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+                  <NumberInput
+                    label="Minimo de noites"
+                    min={1}
+                    value={minimumNights}
+                    onChange={(v) => setMinimumNights(Number(v) || 1)}
+                    leftSection={<Clock3 size={14} />}
+                  />
+                  <NumberInput label="Taxa de limpeza (R$)" min={0} value={cleaningFee} onChange={(v) => setCleaningFee(Number(v) || 0)} />
+                  <NumberInput label="Caucao (R$)" min={0} value={securityDeposit} onChange={(v) => setSecurityDeposit(Number(v) || 0)} />
+                  <SimpleGrid cols={2} spacing="xs">
+                    <TextInput label="Check-in" type="time" value={checkInTime} onChange={(e) => setCheckInTime(e.currentTarget.value)} />
+                    <TextInput label="Check-out" type="time" value={checkOutTime} onChange={(e) => setCheckOutTime(e.currentTarget.value)} />
+                  </SimpleGrid>
+                </SimpleGrid>
+                <Textarea
+                  label="Regras da casa"
+                  placeholder="Ex: sem festas apos 22h, respeito aos vizinhos..."
+                  minRows={2}
+                  autosize
+                  value={houseRules}
+                  onChange={(e) => setHouseRules(e.currentTarget.value)}
+                />
+              </Stack>
             </Stack>
           ) : null}
 
+          {/* ── STEP 1: Localização ── */}
           {step === 1 ? (
             <Stack gap="md">
-              <TextInput
-                label="CEP"
-                placeholder="00000-000"
-                value={cep}
-                onChange={(e) => setCep(formatCep(e.currentTarget.value))}
-                required
-              />
-
-              <TextInput
-                label="Endereco de referencia"
-                value={addressText}
-                onChange={(e) => setAddressText(e.currentTarget.value)}
-                placeholder="Rua, numero, bairro"
-                required
-              />
-
-              <Alert color="blue" variant="light">
-                O mapa usa CEP + endereco para posicionar a casa com mais precisao.
+              <Text fw={700} size="sm" className="announce-section-label">Endereco do imovel</Text>
+              <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+                <TextInput
+                  label="CEP"
+                  placeholder="00000-000"
+                  value={cep}
+                  onChange={(e) => setCep(formatCep(e.currentTarget.value))}
+                  error={cep && !isValidCep(sanitizeCep(cep)) ? 'CEP invalido — use 8 digitos' : undefined}
+                  required
+                />
+                <TextInput
+                  label="Endereco completo"
+                  placeholder="Rua, numero, bairro"
+                  value={addressText}
+                  onChange={(e) => setAddressText(e.currentTarget.value)}
+                  required
+                />
+              </SimpleGrid>
+              <Alert color="blue" variant="light" radius="xl" icon={<MapPin size={15} />}>
+                O mapa usa CEP + endereco para posicionar seu imovel com precisao.
               </Alert>
-
-              {cep && !isValidCep(sanitizeCep(cep)) ? <Alert color="yellow">CEP invalido. Use 8 digitos.</Alert> : null}
             </Stack>
           ) : null}
 
+          {/* ── STEP 2: Fotos ── */}
           {step === 2 ? (
             <Stack gap="md">
+              <Group justify="space-between" align="center">
+                <Text fw={700} size="sm" className="announce-section-label">Fotos do imovel</Text>
+                <Badge
+                  radius="xl"
+                  color={photos.length >= 3 ? 'teal' : 'orange'}
+                  variant="light"
+                  size="sm"
+                >
+                  {photos.length} foto{photos.length !== 1 ? 's' : ''} {photos.length >= 3 ? '✓' : '(min. 3)'}
+                </Badge>
+              </Group>
+
               <FileInput
-                label="Fotos (minimo 3)"
-                placeholder="Selecione fotos"
+                placeholder="Toque para selecionar fotos"
                 multiple
                 accept="image/*"
                 leftSection={<ImagePlus size={16} />}
                 onChange={onSelectPhotos}
               />
 
-              <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="sm">
-                {photos.map((photo, index) => (
-                  <Card key={photo.id} withBorder radius="lg" p="xs">
-                    <Stack gap="xs">
-                      <img src={photo.previewUrl} alt={`Foto ${index + 1}`} className="draft-photo" />
-                      <Group justify="space-between" wrap="nowrap">
+              {photos.length === 0 ? (
+                <div className="announce-photos-empty">
+                  <ImagePlus size={32} style={{ color: '#94a3b8' }} />
+                  <Text size="sm" c="dimmed">Adicione pelo menos 3 fotos do imovel</Text>
+                  <Text size="xs" c="dimmed">A primeira foto sera a capa do anuncio</Text>
+                </div>
+              ) : (
+                <SimpleGrid cols={{ base: 2, sm: 3 }} spacing="sm">
+                  {photos.map((photo, index) => (
+                    <div key={photo.id} className="announce-photo-card">
+                      <img src={photo.previewUrl} alt={`Foto ${index + 1}`} className="announce-photo-img" />
+                      <div className="announce-photo-overlay">
                         {index === 0 ? (
-                          <Badge color="ocean">CAPA</Badge>
+                          <Badge color="ocean" size="xs" radius="xl">CAPA</Badge>
                         ) : (
-                          <Button
-                            variant="light"
-                            size="compact-sm"
-                            leftSection={<Star size={14} />}
-                            onClick={() => setCoverPhoto(photo.id)}
-                          >
-                            Capa
-                          </Button>
+                          <button type="button" className="announce-photo-cover-btn" onClick={() => setCoverPhoto(photo.id)}>
+                            <Star size={11} />
+                            <span>Capa</span>
+                          </button>
                         )}
-
-                        <ActionIcon color="red" variant="light" onClick={() => removePhoto(photo.id)}>
-                          <Trash2 size={14} />
+                        <ActionIcon
+                          size="sm"
+                          color="red"
+                          variant="filled"
+                          radius="xl"
+                          onClick={() => removePhoto(photo.id)}
+                        >
+                          <Trash2 size={11} />
                         </ActionIcon>
-                      </Group>
-                    </Stack>
-                  </Card>
-                ))}
-              </SimpleGrid>
-
-              <Text size="sm" c={photos.length >= 3 ? 'teal' : 'red'}>
-                Selecionadas: {photos.length} (minimo 3)
-              </Text>
+                      </div>
+                    </div>
+                  ))}
+                </SimpleGrid>
+              )}
             </Stack>
           ) : null}
 
-          {errorMessage ? <Alert color="red">{errorMessage}</Alert> : null}
+          {publishSuccessMessage ? <Alert color="teal" radius="xl">{publishSuccessMessage}</Alert> : null}
+          {errorMessage ? <Alert color="red" radius="xl">{errorMessage}</Alert> : null}
 
+          {/* Navigation */}
           <Group justify="space-between">
             <Button
               variant="default"
-              onClick={() => setStep((value) => Math.max(0, value - 1))}
+              radius="xl"
+              onClick={() => setStep((v) => Math.max(0, v - 1))}
               disabled={step === 0 || loading}
             >
               Voltar
             </Button>
 
             {step < 2 ? (
-              <Button onClick={() => setStep((value) => Math.min(2, value + 1))} disabled={!canGoNext || loading}>
+              <Button
+                radius="xl"
+                onClick={() => setStep((v) => Math.min(2, v + 1))}
+                disabled={!canGoNext || loading}
+              >
                 Proximo
               </Button>
             ) : (
-              <Button loading={loading} onClick={() => void publishProperty()}>
+              <Button
+                radius="xl"
+                loading={loading}
+                onClick={() => void publishProperty()}
+                leftSection={<CheckCircle2 size={16} />}
+              >
                 Publicar anuncio
               </Button>
             )}

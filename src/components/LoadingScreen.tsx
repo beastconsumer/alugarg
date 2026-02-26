@@ -1,18 +1,37 @@
-import { Center, Paper, Stack, Text } from '@mantine/core';
-import UseAnimations from 'react-useanimations';
-import loadingAnimated from 'react-useanimations/lib/loading2';
+const LETTERS_ALUGA = ['A', 'l', 'u', 'g', 'a'];
+const LETTERS_SUL = ['S', 'u', 'l'];
 
-export function LoadingScreen({ message = 'Carregando...' }: { message?: string }) {
+export function LoadingScreen() {
   return (
-    <Center mih="100dvh" p="md">
-      <Paper withBorder radius="xl" shadow="md" p="xl" maw={420} w="100%">
-        <Stack align="center" gap="md">
-          <UseAnimations animation={loadingAnimated} size={48} strokeColor="#1f5ed6" autoplay loop speed={0.8} />
-          <Text c="dimmed" ta="center">
-            {message}
-          </Text>
-        </Stack>
-      </Paper>
-    </Center>
+    <div className="app-loading-screen">
+      <div className="app-loading-inner">
+        <img src="/logoapp.png" alt="" className="app-loading-logo" />
+
+        <div className="app-loading-name" aria-label="AlugaSul">
+          <span className="app-loading-word">
+            {LETTERS_ALUGA.map((l, i) => (
+              <span key={i} className="app-loading-letter" style={{ animationDelay: `${0.25 + i * 0.07}s` }}>
+                {l}
+              </span>
+            ))}
+          </span>
+          <span className="app-loading-word app-loading-word--blue">
+            {LETTERS_SUL.map((l, i) => (
+              <span key={i} className="app-loading-letter" style={{ animationDelay: `${0.25 + (5 + i) * 0.07}s` }}>
+                {l}
+              </span>
+            ))}
+          </span>
+        </div>
+
+        <p className="app-loading-tagline">Sua estadia perfeita</p>
+      </div>
+
+      <div className="app-loading-bottom">
+        <div className="app-loading-bar-track">
+          <div className="app-loading-bar-fill" />
+        </div>
+      </div>
+    </div>
   );
 }

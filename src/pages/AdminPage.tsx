@@ -17,7 +17,7 @@ import {
   Title,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { CheckCircle2, Clock3, Lock, MessageSquare, RefreshCw, Search, ShieldCheck, ShieldUser, Unlock, XCircle } from 'lucide-react';
+import { CheckCircle2, Clock3, LifeBuoy, Lock, MessageSquare, RefreshCw, Search, ShieldCheck, ShieldUser, Unlock, XCircle } from 'lucide-react';
 import { createSignedDocumentUrlByRef, supabase } from '../lib/supabase';
 import { normalizePhone } from '../lib/phone';
 import { formatDate, formatMoney } from '../lib/format';
@@ -30,7 +30,10 @@ import {
   parseChatMessage,
   parseProfile,
   parseProperty,
+  parseSupportTicket,
   Property,
+  SupportTicket,
+  SupportTicketStatus,
   UserProfile,
 } from '../lib/types';
 
@@ -61,6 +64,16 @@ const hostStatusMeta: Record<
   pending: { label: 'Em analise', color: 'yellow' },
   verified: { label: 'Verificado', color: 'green' },
   rejected: { label: 'Rejeitado', color: 'red' },
+};
+
+const supportStatusMeta: Record<
+  SupportTicketStatus,
+  { label: string; color: 'gray' | 'blue' | 'teal' | 'red' }
+> = {
+  open: { label: 'Aberto', color: 'red' },
+  in_progress: { label: 'Em atendimento', color: 'blue' },
+  resolved: { label: 'Resolvido', color: 'teal' },
+  closed: { label: 'Fechado', color: 'gray' },
 };
 
 const getChatSenderRole = (
@@ -103,6 +116,10 @@ export function AdminPage() {
   const [selectedConversationId, setSelectedConversationId] = useState('');
   const [adminMessage, setAdminMessage] = useState('');
   const [chatFilter, setChatFilter] = useState<'all' | 'open' | 'closed' | 'blocked'>('open');
+  const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([]);
+  const [supportFilter, setSupportFilter] = useState<'all' | SupportTicketStatus>('open');
+  const [supportSearch, setSupportSearch] = useState('');
+  const [supportNoteDrafts, setSupportNoteDrafts] = useState<Record<string, string>>({});
 
   const [usersById, setUsersById] = useState<Record<string, UserProfile>>({});
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
@@ -194,8 +211,16 @@ export function AdminPage() {
       { total: 0, blocked: 0, admins: 0, hosts: 0 },
     );
 
-    return { propertiesSummary, bookingsSummary, chatsSummary, hostsSummary, usersSummary };
-  }, [allUsers, bookings, conversations, hostUsers, properties]);
+    const supportSummary = supportTickets.reduce(
+      (acc, item) => {
+        acc[item.status] += 1;
+        return acc;
+      },
+      { open: 0, in_progress: 0, resolved: 0, closed: 0 } as Record<SupportTicketStatus, number>,
+    );
+
+    return { propertiesSummary, bookingsSummary, chatsSummary, hostsSummary, usersSummary, supportSummary };
+  }, [allUsers, bookings, conversations, hostUsers, properties, supportTickets]);
 
   const filteredHostUsers = useMemo(() => {
     if (hostFilter === 'all') return hostUsers;
@@ -228,6 +253,34 @@ export function AdminPage() {
       return haystack.includes(term);
     });
   }, [allUsers, userFilter, userSearch]);
+
+  const filteredSupportTickets = useMemo(() => {
+    let current = supportTickets;
+
+    if (supportFilter !== 'all') {
+      current = current.filter((item) => item.status === supportFilter);
+    }
+
+    const term = supportSearch.trim().toLowerCase();
+    if (!term) return current;
+
+    return current.filter((item) => {
+      const ticketUser = usersById[item.user_id];
+      const haystack = [
+        item.subject,
+        item.message,
+        item.category,
+        item.id,
+        ticketUser?.name,
+        ticketUser?.email,
+        ticketUser?.phone,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(term);
+    });
+  }, [supportFilter, supportSearch, supportTickets, usersById]);
 
   const hostFilterOptions = useMemo(
     () =>
@@ -372,29 +425,43 @@ export function AdminPage() {
     setErrorMessage('');
 
     try {
-      const [propertiesRes, bookingsRes, conversationsRes, usersRes] = await Promise.all([
+      const [propertiesRes, bookingsRes, conversationsRes, usersRes, supportRes] = await Promise.all([
         supabase.from('properties').select('*').order('created_at', { ascending: false }),
         supabase.from('bookings').select('*').order('created_at', { ascending: false }),
         supabase.from('chat_conversations').select('*').order('last_message_at', { ascending: false }),
         supabase.from('users').select('*').order('created_at', { ascending: false }),
+        supabase.from('support_tickets').select('*').order('created_at', { ascending: false }),
       ]);
 
       if (propertiesRes.error) throw propertiesRes.error;
       if (bookingsRes.error) throw bookingsRes.error;
       if (conversationsRes.error) throw conversationsRes.error;
       if (usersRes.error) throw usersRes.error;
+      if (supportRes.error) throw supportRes.error;
 
       const parsedProperties = (propertiesRes.data ?? []).map((row) => parseProperty(row));
       const parsedBookings = (bookingsRes.data ?? []).map((row) => parseBooking(row));
       const parsedConversations = (conversationsRes.data ?? []).map((row) => parseChatConversation(row));
       const parsedUsers = (usersRes.data ?? []).map((row) => parseProfile(row));
       const parsedHostUsers = parsedUsers.filter((item) => item.host_verification_status !== 'not_started');
+      const parsedSupportTickets = (supportRes.data ?? []).map((row) => parseSupportTicket(row));
 
       setProperties(parsedProperties);
       setBookings(parsedBookings);
       setConversations(parsedConversations);
       setAllUsers(parsedUsers);
       setHostUsers(parsedHostUsers);
+      setSupportTickets(parsedSupportTickets);
+
+      setSupportNoteDrafts((current) => {
+        const next = { ...current };
+        parsedSupportTickets.forEach((item) => {
+          if (typeof next[item.id] !== 'string') {
+            next[item.id] = item.admin_note || '';
+          }
+        });
+        return next;
+      });
 
       const mapped: Record<string, UserProfile> = {};
       parsedUsers.forEach((item) => {
@@ -439,6 +506,9 @@ export function AdminPage() {
         void loadDashboardData();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_conversations' }, () => {
+        void loadDashboardData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'support_tickets' }, () => {
         void loadDashboardData();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_messages' }, () => {
@@ -593,6 +663,40 @@ export function AdminPage() {
     });
   };
 
+  const updateSupportTicketStatus = async (ticketId: string, status: SupportTicketStatus) => {
+    await runAdminAction(async () => {
+      const payload: Record<string, unknown> = {
+        status,
+        updated_at: new Date().toISOString(),
+        assigned_admin_id: sessionUserId || null,
+      };
+
+      if (status === 'resolved' || status === 'closed') {
+        payload.resolved_at = new Date().toISOString();
+      } else {
+        payload.resolved_at = null;
+      }
+
+      const { error } = await supabase.from('support_tickets').update(payload).eq('id', ticketId);
+      if (error) throw error;
+    });
+  };
+
+  const saveSupportTicketNote = async (ticketId: string) => {
+    const note = (supportNoteDrafts[ticketId] ?? '').trim();
+    await runAdminAction(async () => {
+      const { error } = await supabase
+        .from('support_tickets')
+        .update({
+          admin_note: note,
+          assigned_admin_id: sessionUserId || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', ticketId);
+      if (error) throw error;
+    });
+  };
+
   const sendAdminSystemMessage = async (event: FormEvent) => {
     event.preventDefault();
 
@@ -734,7 +838,7 @@ export function AdminPage() {
         </Group>
       </Card>
 
-      <SimpleGrid cols={{ base: 1, xs: 2, md: 6 }} spacing="sm">
+      <SimpleGrid cols={{ base: 1, xs: 2, md: 7 }} spacing="sm">
         <Card withBorder radius="xl" p="md" className="admin-kpi">
           <Text c="dimmed" size="sm" className="admin-muted">
             Anuncios pendentes
@@ -783,6 +887,14 @@ export function AdminPage() {
             {summary.usersSummary.blocked}
           </Title>
         </Card>
+        <Card withBorder radius="xl" p="md" className="admin-kpi">
+          <Text c="dimmed" size="sm" className="admin-muted">
+            Tickets abertos
+          </Text>
+          <Title order={3} className="admin-title">
+            {summary.supportSummary.open}
+          </Title>
+        </Card>
       </SimpleGrid>
 
       {loadingData ? (
@@ -798,7 +910,8 @@ export function AdminPage() {
           <Tabs.Tab value="bookings">Reservas</Tabs.Tab>
           <Tabs.Tab value="hosts">Anfitrioes</Tabs.Tab>
           <Tabs.Tab value="users">Usuarios</Tabs.Tab>
-          <Tabs.Tab value="chats">Suporte</Tabs.Tab>
+          <Tabs.Tab value="chats">Chats</Tabs.Tab>
+          <Tabs.Tab value="support">Suporte</Tabs.Tab>
         </Tabs.List>
 
         <Tabs.Panel value="properties" pt="md">
@@ -815,7 +928,7 @@ export function AdminPage() {
                         {property.location.addressText || 'Sem endereco'}
                       </Text>
                       <Text size="sm" className="admin-title">
-                        {formatMoney(property.price)} - {property.rent_type}
+                        {formatMoney(property.price)} - {(property.rent_types?.length ? property.rent_types.join(', ') : property.rent_type)}
                       </Text>
                       <Text c="dimmed" size="sm" className="admin-muted">
                         Status: {property.status} - Criado em {formatDate(property.created_at)}
@@ -1166,7 +1279,7 @@ export function AdminPage() {
             </Card>
 
             {filteredUsers.map((userItem) => {
-              const isProtectedAdmin = userItem.role === 'admin' || userItem.id === sessionUserId;
+              const isProtectedAccount = userItem.id === sessionUserId;
               const hostMeta = hostStatusMeta[userItem.host_verification_status];
               const initial = (userItem.name || userItem.email || 'U').charAt(0).toUpperCase();
 
@@ -1236,14 +1349,14 @@ export function AdminPage() {
                           leftSection={<Lock size={14} />}
                           loading={actionLoading}
                           onClick={() => void updateUserBlockStatus(userItem.id, true)}
-                          disabled={isProtectedAdmin}
+                          disabled={isProtectedAccount}
                         >
                           Bloquear
                         </Button>
                       )}
-                      {isProtectedAdmin ? (
+                      {isProtectedAccount ? (
                         <Badge size="xs" color="gray" variant="light">
-                          Conta protegida
+                          Conta atual
                         </Badge>
                       ) : null}
                     </Group>
@@ -1266,10 +1379,10 @@ export function AdminPage() {
               <Group justify="space-between" align="flex-start" wrap="wrap">
                 <Stack gap={2}>
                   <Title order={4} className="admin-title">
-                    Central de suporte e chat
+                    Chats da plataforma
                   </Title>
                   <Text size="sm" c="dimmed" className="admin-muted">
-                    Atenda usuarios por conversa de reserva com separacao clara entre cliente e anfitriao.
+                    Conversas entre cliente e anfitriao vinculadas a reservas.
                   </Text>
                 </Stack>
 
@@ -1454,6 +1567,153 @@ export function AdminPage() {
               </Stack>
             </Card>
           </SimpleGrid>
+        </Tabs.Panel>
+
+        <Tabs.Panel value="support" pt="md">
+          <Stack gap="sm">
+            <Card withBorder radius="xl" p="md" className="admin-entity-card">
+              <Stack gap="sm">
+                <Group justify="space-between" align="flex-start" wrap="wrap">
+                  <Stack gap={2}>
+                    <Title order={4} className="admin-title">
+                      Tickets de suporte
+                    </Title>
+                    <Text size="sm" c="dimmed" className="admin-muted">
+                      Atendimento exclusivo de chamados abertos pelo usuario no Perfil.
+                    </Text>
+                  </Stack>
+                  <SegmentedControl
+                    value={supportFilter}
+                    onChange={(value) => setSupportFilter(value as 'all' | SupportTicketStatus)}
+                    data={[
+                      { label: `Abertos (${summary.supportSummary.open})`, value: 'open' },
+                      { label: `Atend. (${summary.supportSummary.in_progress})`, value: 'in_progress' },
+                      { label: `Resolvidos (${summary.supportSummary.resolved})`, value: 'resolved' },
+                      { label: `Fechados (${summary.supportSummary.closed})`, value: 'closed' },
+                      { label: `Todos (${supportTickets.length})`, value: 'all' },
+                    ]}
+                  />
+                </Group>
+
+                <TextInput
+                  value={supportSearch}
+                  onChange={(event) => setSupportSearch(event.currentTarget.value)}
+                  leftSection={<Search size={15} />}
+                  placeholder="Buscar por assunto, usuario, email ou id do ticket"
+                />
+              </Stack>
+            </Card>
+
+            {filteredSupportTickets.map((ticket) => {
+              const ticketUser = usersById[ticket.user_id];
+              const statusMeta = supportStatusMeta[ticket.status];
+              const noteDraft = supportNoteDrafts[ticket.id] ?? ticket.admin_note ?? '';
+
+              return (
+                <Card key={ticket.id} withBorder radius="xl" p="md" className="admin-entity-card">
+                  <Stack gap="sm">
+                    <Group justify="space-between" align="flex-start" wrap="wrap">
+                      <Stack gap={3} style={{ minWidth: 0 }}>
+                        <Text fw={700} className="admin-title">
+                          {ticket.subject || 'Ticket sem assunto'}
+                        </Text>
+                        <Text size="sm" c="dimmed" className="admin-muted">
+                          Usuario: {ticketUser?.name || ticket.user_id}
+                        </Text>
+                        <Text size="sm" c="dimmed" className="admin-muted">
+                          Email: {ticketUser?.email || '-'} - Telefone: {ticketUser?.phone || '-'}
+                        </Text>
+                        <Text size="xs" c="dimmed" className="admin-muted">
+                          Criado em {formatDate(ticket.created_at)} - Atualizado em {formatDate(ticket.updated_at)}
+                        </Text>
+                      </Stack>
+
+                      <Group gap={6} wrap="wrap">
+                        <Badge color={statusMeta.color} variant="light">
+                          {statusMeta.label}
+                        </Badge>
+                        <Badge variant="light" color="gray">
+                          {ticket.category || 'geral'}
+                        </Badge>
+                      </Group>
+                    </Group>
+
+                    <Card withBorder radius="lg" p="sm">
+                      <Text size="sm" className="admin-title">
+                        {ticket.message}
+                      </Text>
+                    </Card>
+
+                    <Group gap="xs" wrap="wrap">
+                      <Button
+                        size="xs"
+                        variant="default"
+                        leftSection={<LifeBuoy size={14} />}
+                        loading={actionLoading}
+                        onClick={() => void updateSupportTicketStatus(ticket.id, 'in_progress')}
+                      >
+                        Marcar em atendimento
+                      </Button>
+                      <Button
+                        size="xs"
+                        color="teal"
+                        variant="light"
+                        loading={actionLoading}
+                        onClick={() => void updateSupportTicketStatus(ticket.id, 'resolved')}
+                      >
+                        Resolver
+                      </Button>
+                      <Button
+                        size="xs"
+                        color="gray"
+                        variant="light"
+                        loading={actionLoading}
+                        onClick={() => void updateSupportTicketStatus(ticket.id, 'closed')}
+                      >
+                        Fechar
+                      </Button>
+                      <Button
+                        size="xs"
+                        color="red"
+                        variant="light"
+                        loading={actionLoading}
+                        onClick={() => void updateSupportTicketStatus(ticket.id, 'open')}
+                      >
+                        Reabrir
+                      </Button>
+                    </Group>
+
+                    <Group align="flex-end" grow>
+                      <TextInput
+                        label="Resposta / nota interna"
+                        value={noteDraft}
+                        onChange={(event) =>
+                          setSupportNoteDrafts((current) => ({
+                            ...current,
+                            [ticket.id]: event.currentTarget.value,
+                          }))
+                        }
+                        placeholder="Registre orientacao para o usuario ou anotacao da equipe"
+                      />
+                      <Button
+                        size="xs"
+                        loading={actionLoading}
+                        onClick={() => void saveSupportTicketNote(ticket.id)}
+                      >
+                        Salvar nota
+                      </Button>
+                    </Group>
+                  </Stack>
+                </Card>
+              );
+            })}
+
+            {filteredSupportTickets.length === 0 ? (
+              <Text c="dimmed" className="admin-muted">
+                Nenhum ticket encontrado para o filtro atual.
+              </Text>
+            ) : null}
+          </Stack>
         </Tabs.Panel>
       </Tabs>
     </Stack>

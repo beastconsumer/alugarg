@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Badge, Button, Card, Group, Popover, Stack, Text, TextInput, Title, UnstyledButton } from '@mantine/core';
+import { Badge, Button, Card, Group, Popover, Skeleton, Stack, Text, TextInput, Title, UnstyledButton } from '@mantine/core';
 import { DatePicker, type DatesRangeValue } from '@mantine/dates';
 import { useMediaQuery } from '@mantine/hooks';
 import { format } from 'date-fns';
@@ -8,12 +8,12 @@ import {
   Building2,
   CalendarDays,
   Compass,
+  HouseIcon,
   LocateFixed,
   MapPinned,
   Minus,
   Plus,
   Search,
-  Star,
   Users,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -118,6 +118,7 @@ export function HomePage() {
   const [useNearbyMode, setUseNearbyMode] = useState(false);
   const [locating, setLocating] = useState(false);
   const [myCoords, setMyCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [rentTypeFilter, setRentTypeFilter] = useState<'all' | 'diaria' | 'temporada' | 'mensal'>('all');
 
   const loadApprovedProperties = async () => {
     setLoading(true);
@@ -251,14 +252,10 @@ export function HomePage() {
     setSearch('');
     setDestinationInput('');
     setDateRange([null, null]);
-    setGuests({
-      adults: 0,
-      children: 0,
-      babies: 0,
-      pets: 0,
-    });
+    setGuests({ adults: 0, children: 0, babies: 0, pets: 0 });
     setUseNearbyMode(false);
     setMyCoords(null);
+    setRentTypeFilter('all');
   };
 
   const filteredProperties = useMemo(() => {
@@ -267,6 +264,10 @@ export function HomePage() {
     return allProperties.filter((property) => {
       if (totalGuests > 0 && property.guests_capacity < totalGuests) return false;
       if (guests.pets > 0 && !property.pet_friendly) return false;
+      if (rentTypeFilter !== 'all') {
+        const supportedRentTypes = property.rent_types?.length ? property.rent_types : [property.rent_type];
+        if (!supportedRentTypes.includes(rentTypeFilter)) return false;
+      }
 
       if (useNearbyMode) return true;
       if (!normalizedSearch) return true;
@@ -274,7 +275,7 @@ export function HomePage() {
       const searchable = [property.title, property.description, property.location.addressText].join(' ').toLowerCase();
       return searchable.includes(normalizedSearch);
     });
-  }, [allProperties, guests.pets, search, totalGuests, useNearbyMode]);
+  }, [allProperties, guests.pets, rentTypeFilter, search, totalGuests, useNearbyMode]);
 
   const sortedProperties = useMemo(() => {
     if (!useNearbyMode || !myCoords) return filteredProperties;
@@ -325,28 +326,30 @@ export function HomePage() {
         >
           <Popover.Target>
             <UnstyledButton
-              className="home-discovery-trigger"
+              className={`home-discovery-trigger ${hasActiveFilters ? 'has-filters' : ''}`}
               onClick={() => {
                 setDestinationInput((current) => current || search);
                 setSearchMenuOpen(true);
               }}
             >
               <div className="home-discovery-trigger-main">
-                <Text fw={700}>Pesquisar</Text>
-                <Text className="home-discovery-trigger-sub">{whereLabel}</Text>
+                <Text fw={700} size="sm">
+                  {hasDestinationFilter ? whereLabel : 'Para onde voce vai?'}
+                </Text>
+                <Text className="home-discovery-trigger-sub" size="xs">
+                  {hasDateFilter ? formatDateRange(dateRange) : 'Datas'}
+                  {' - '}
+                  {hasGuestFilter ? whoLabel : 'Hospedes'}
+                </Text>
               </div>
 
               <div className="home-discovery-trigger-meta">
-                <span>
-                  <CalendarDays size={13} /> {formatDateRange(dateRange)}
-                </span>
-                <span>
-                  <Users size={13} /> {whoLabel}
-                </span>
+                <span><CalendarDays size={12} /> {formatDateRange(dateRange)}</span>
+                <span><Users size={12} /> {whoLabel}</span>
               </div>
 
               <span className="home-discovery-trigger-search" aria-hidden>
-                <Search size={16} />
+                <Search size={15} />
               </span>
             </UnstyledButton>
           </Popover.Target>
@@ -570,19 +573,62 @@ export function HomePage() {
         </Popover>
       </Card>
 
-      {loading ? <Text c="dimmed">Carregando propriedades...</Text> : null}
+      {/* ── Filter type chips ── */}
+      <div className="home-type-chips">
+        {(
+          [
+            { value: 'all',       label: 'Todos' },
+            { value: 'diaria',    label: 'Diaria' },
+            { value: 'temporada', label: 'Temporada' },
+            { value: 'mensal',    label: 'Mensal' },
+          ] as const
+        ).map((chip) => (
+          <button
+            key={chip.value}
+            type="button"
+            className={`home-type-chip ${rentTypeFilter === chip.value ? 'active' : ''}`}
+            onClick={() => setRentTypeFilter(chip.value)}
+          >
+            {chip.label}
+          </button>
+        ))}
+
+        {(hasActiveFilters || rentTypeFilter !== 'all') ? (
+          <button
+            type="button"
+            className="home-type-chip home-type-chip-clear"
+            onClick={clearSearchFilters}
+          >
+            Limpar filtros x
+          </button>
+        ) : null}
+      </div>
+
       {errorMessage ? <Text c="red">{errorMessage}</Text> : null}
+
+      {loading ? (
+        <Stack gap="xl">
+          {[0, 1].map((s) => (
+            <section key={s} className="home-carousel-section">
+              <Skeleton height={22} width={280} radius="md" mb={6} />
+              <Skeleton height={14} width={200} radius="md" mb={14} />
+              <div className="home-horizontal-scroll">
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="home-skeleton-item">
+                    <Skeleton height={330} radius="xl" />
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))}
+        </Stack>
+      ) : null}
 
       {!loading && !errorMessage ? (
         sortedProperties.length > 0 ? (
-          <Stack gap="lg">
+          <Stack gap="xl">
             <section className="home-carousel-section">
-              <Group gap={8} align="center" className="home-section-title-row">
-                <span className="home-section-icon" aria-hidden>
-                  <Star size={16} />
-                </span>
-                <Title order={3}>Acomodacoes em Balneario Cassino</Title>
-              </Group>
+              <Title order={3} className="home-section-title-row">Acomodacoes em Balneario Cassino</Title>
               <Text size="sm" c="dimmed" className="home-section-subtitle">
                 Opcoes selecionadas para seu perfil de busca.
               </Text>
@@ -594,12 +640,7 @@ export function HomePage() {
             </section>
 
             <section className="home-carousel-section">
-              <Group gap={8} align="center" className="home-section-title-row">
-                <span className="home-section-icon" aria-hidden>
-                  <Building2 size={16} />
-                </span>
-                <Title order={3}>Acomodacoes muito procuradas em Rio Grande</Title>
-              </Group>
+              <Title order={3} className="home-section-title-row">Acomodacoes muito procuradas em Rio Grande</Title>
               <Text size="sm" c="dimmed" className="home-section-subtitle">
                 Casas e apartamentos com maior procura na regiao.
               </Text>
@@ -611,8 +652,19 @@ export function HomePage() {
             </section>
           </Stack>
         ) : (
-          <Card withBorder radius="xl" p="lg">
-            <Text c="dimmed">Nenhum imovel encontrado com os filtros atuais.</Text>
+          <Card withBorder radius="xl" p="xl">
+            <div className="empty-state">
+              <div className="empty-state-icon">
+                <HouseIcon size={32} />
+              </div>
+              <Text fw={700} size="lg">Nenhum imovel encontrado</Text>
+              <Text c="dimmed" size="sm">
+                Tente ajustar os filtros de busca ou limpar os criterios para ver todos os imoveis disponiveis.
+              </Text>
+              <Button radius="xl" variant="light" onClick={clearSearchFilters}>
+                Limpar filtros
+              </Button>
+            </div>
           </Card>
         )
       ) : null}

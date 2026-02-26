@@ -112,6 +112,13 @@ export function SignUpPage() {
   return (
     <Box className="auth-clean-shell">
       <Container size="sm" className="auth-clean-container">
+        {/* Brand header */}
+        <div className="auth-brand-header">
+          <img src="/logoapp.png" alt="AlugaSul" className="auth-brand-logo" />
+          <span className="auth-brand-name">AlugaSul</span>
+          <span className="auth-brand-tagline">Aluguel de temporada no Sul</span>
+        </div>
+
         <Paper withBorder radius="xl" p="xl" className="auth-clean-card">
           <Stack gap="lg">
             <Stack gap={4}>
@@ -201,7 +208,7 @@ export function SignUpPage() {
                   </Alert>
                 ) : null}
 
-                <Button type="submit" loading={loading} leftSection={<UserPlus size={16} />} fullWidth>
+                <Button type="submit" loading={loading} leftSection={<UserPlus size={16} />} fullWidth radius="xl">
                   Criar conta
                 </Button>
               </Stack>

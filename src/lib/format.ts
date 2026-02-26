@@ -14,6 +14,20 @@ export const formatMoney = (value: number): string => moneyFormatter.format(valu
 
 export const formatDate = (value: string | Date): string => dateFormatter.format(new Date(value));
 
+const chatTimeFormatter = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' });
+const chatDayFormatter = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit' });
+
+export const formatChatTime = (value: string | Date): string => {
+  const date = new Date(value);
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfYesterday = new Date(startOfToday.getTime() - 86_400_000);
+  const time = chatTimeFormatter.format(date);
+  if (date >= startOfToday) return `Hoje as ${time}`;
+  if (date >= startOfYesterday) return `Ontem as ${time}`;
+  return `${chatDayFormatter.format(date)} as ${time}`;
+};
+
 export const parseBirthDateText = (value: string): string | null => {
   const match = value.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
   if (!match) {

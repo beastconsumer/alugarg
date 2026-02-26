@@ -10,7 +10,6 @@ import {
   Group,
   MultiSelect,
   NumberInput,
-  Select,
   SimpleGrid,
   Stack,
   Switch,
@@ -62,7 +61,7 @@ export function EditPropertyPage() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState<number | ''>('');
-  const [rentType, setRentType] = useState<RentType>('mensal');
+  const [rentTypes, setRentTypes] = useState<RentType[]>(['mensal']);
   const [bedrooms, setBedrooms] = useState(1);
   const [bathrooms, setBathrooms] = useState(1);
   const [garageSpots, setGarageSpots] = useState(0);
@@ -117,7 +116,7 @@ export function EditPropertyPage() {
         setTitle(parsed.title);
         setDescription(parsed.description);
         setPrice(parsed.price);
-        setRentType(parsed.rent_type);
+        setRentTypes(parsed.rent_types?.length ? parsed.rent_types : [parsed.rent_type]);
         setBedrooms(parsed.bedrooms);
         setBathrooms(parsed.bathrooms);
         setGarageSpots(parsed.garage_spots);
@@ -225,7 +224,8 @@ export function EditPropertyPage() {
           title: title.trim(),
           description: description.trim(),
           price: Number(price),
-          rent_type: rentType,
+          rent_type: rentTypes[0] ?? 'mensal',
+          rent_types: rentTypes,
           bedrooms,
           bathrooms,
           garage_spots: garageSpots,
@@ -310,15 +310,20 @@ export function EditPropertyPage() {
               onChange={(value) => setPrice(typeof value === 'number' ? value : '')}
               required
             />
-            <Select
-              label="Tipo"
+            <MultiSelect
+              label="Tipos"
               data={[
                 { value: 'mensal', label: 'Mensal' },
                 { value: 'temporada', label: 'Temporada' },
                 { value: 'diaria', label: 'Diaria' },
               ]}
-              value={rentType}
-              onChange={(value) => setRentType((value as RentType) || 'mensal')}
+              value={rentTypes}
+              onChange={(value) => {
+                const normalized = value.filter(
+                  (item): item is RentType => item === 'diaria' || item === 'temporada' || item === 'mensal',
+                );
+                setRentTypes(normalized.length > 0 ? normalized : ['mensal']);
+              }}
             />
           </SimpleGrid>
 

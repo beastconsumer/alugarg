@@ -7,6 +7,7 @@ export const env = {
   supabaseUrl: read('VITE_SUPABASE_URL'),
   supabaseAnonKey: read('VITE_SUPABASE_ANON_KEY'),
   supabaseBucket: read('VITE_SUPABASE_BUCKET', 'property-images'),
+  hostDocumentsBucket: read('VITE_HOST_DOCUMENTS_BUCKET', 'host-documents'),
 };
 
 export const envIssue = (() => {

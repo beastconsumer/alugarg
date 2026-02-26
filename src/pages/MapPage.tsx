@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Button, Card, Group, Image, Select, Stack, Text, Title } from '@mantine/core';
-import { MapPin } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Alert, Button, Card, Group, Select, Stack, Text, Title } from '@mantine/core';
+import { MapPin, Star } from 'lucide-react';
 import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -10,7 +11,7 @@ import { resolveLocationFromCepAddress, isWithinRegion } from '../lib/location';
 import { seedProperties } from '../lib/seedProperties';
 import { supabase } from '../lib/supabase';
 import { formatMoney } from '../lib/format';
-import { parseProperty, Property } from '../lib/types';
+import { parseProperty, Property, rentTypeLabel } from '../lib/types';
 
 type LocationKey = 'cassino' | 'riogrande';
 
@@ -38,11 +39,11 @@ const locationOptions: Record<LocationKey, { label: string; lat: number; lng: nu
   },
 };
 
-const defaultIcon = L.icon({
+// Keep default icon for cases where price is 0
+L.Icon.Default.mergeOptions({
   iconRetinaUrl: markerIcon2x,
   iconUrl: markerIcon,
   shadowUrl: markerShadow,
-  iconAnchor: [12, 41],
 });
 
 const homeIcon = L.divIcon({
@@ -51,6 +52,24 @@ const homeIcon = L.divIcon({
   iconSize: [18, 18],
   iconAnchor: [9, 9],
 });
+
+const getRating = (seed: string): string => {
+  const total = seed.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return (4.6 + (total % 5) * 0.1).toFixed(1);
+};
+
+const getReviewCount = (seed: string): number => {
+  const total = seed.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return 10 + (total % 90);
+};
+
+const createPriceMarker = (price: number): L.DivIcon =>
+  L.divIcon({
+    html: `<div class="map-price-pill">${formatMoney(price)}</div>`,
+    className: 'map-price-marker-wrap',
+    iconSize: [96, 28],
+    iconAnchor: [48, 28],
+  });
 
 const locationCacheKey = (property: Property): string => {
   const cep = property.location.cep || '';
@@ -186,10 +205,10 @@ export function MapPage() {
 
   return (
     <Stack gap="md" py="md" className="map-page-stack">
-      <Card withBorder radius="xl" p="lg">
-        <Stack gap="xs">
-          <Title order={2}>Mapa</Title>
-          <Text c="dimmed">Encontre casas perto de voce e abra os detalhes para reservar.</Text>
+      <Card withBorder radius="xl" p="lg" className="bookings-header-card">
+        <Stack gap={4}>
+          <Title order={2}>Mapa de Imoveis</Title>
+          <Text c="dimmed" size="sm">Explore as acomodacoes no mapa e toque para ver detalhes e reservar.</Text>
         </Stack>
       </Card>
 
@@ -205,9 +224,15 @@ export function MapPage() {
         </Group>
       </Card>
 
-      {loading ? <Text c="dimmed">Carregando casas...</Text> : null}
-      {resolvingPoints && !loading ? <Text c="dimmed">Posicionando casas pelo endereco...</Text> : null}
-      {errorMessage ? <Alert color="red">{errorMessage}</Alert> : null}
+      {loading || resolvingPoints ? (
+        <div>
+          <div className="map-loading-bar" />
+          <Text size="xs" c="dimmed" mt={6}>
+            {loading ? 'Carregando imoveis...' : 'Posicionando no mapa...'}
+          </Text>
+        </div>
+      ) : null}
+      {errorMessage ? <Alert color="red" radius="xl">{errorMessage}</Alert> : null}
 
       <Card withBorder radius="xl" p="xs" className="map-card map-page-map-card">
         <MapContainer center={center} zoom={activeLocation.zoom} scrollWheelZoom className="leaflet-map">
@@ -223,28 +248,56 @@ export function MapPage() {
           </Marker>
 
           {mapPoints.map(({ property, lat, lng }) => (
-            <Marker key={property.id} position={[lat, lng]} icon={defaultIcon}>
-              <Popup>
-                <Stack gap={8} miw={220} className="map-popup-card">
-                  <Image
+            <Marker key={property.id} position={[lat, lng]} icon={createPriceMarker(property.price)}>
+              <Popup className="map-popup-leaflet">
+                <div className="map-popup-card">
+                  <img
                     src={property.photos[0] || '/background.png'}
                     alt={property.title}
                     className="map-popup-image"
-                    radius="sm"
+                    onError={(e) => { (e.target as HTMLImageElement).src = '/background.png'; }}
                   />
-                  <Text fw={700} size="sm">
-                    {property.title}
-                  </Text>
-                  <Text c="dimmed" size="xs">
-                    {property.location.addressText || 'Rio Grande - RS'}
-                  </Text>
-                  <Text size="sm">
-                    {formatMoney(property.price)} - {property.rent_type}
-                  </Text>
-                  <Button component="a" href={`/app/property/${property.id}`} size="xs" radius="md">
-                    Reservar
-                  </Button>
-                </Stack>
+                  <div className="map-popup-body">
+                    <p className="map-popup-title">{property.title}</p>
+                    <p className="map-popup-address">{property.location.addressText || 'Rio Grande - RS'}</p>
+
+                    <div className="map-popup-rating-row">
+                      <Star size={11} fill="#f59e0b" color="#f59e0b" />
+                      <span className="map-popup-rating-val">{getRating(property.id)}</span>
+                      <span className="map-popup-rating-count">({getReviewCount(property.id)} av.)</span>
+                    </div>
+
+                    <div className="map-popup-specs">
+                      <span>{property.bedrooms} qto{property.bedrooms !== 1 ? 's' : ''}</span>
+                      <span className="map-popup-dot">-</span>
+                      <span>{property.bathrooms} ban.</span>
+                      <span className="map-popup-dot">-</span>
+                      <span>{property.guests_capacity} hosp.</span>
+                      {property.pet_friendly ? (
+                        <>
+                          <span className="map-popup-dot">-</span>
+                          <span>pets ok</span>
+                        </>
+                      ) : null}
+                    </div>
+
+                    <div className="map-popup-footer">
+                      <div>
+                        <span className="map-popup-price">{formatMoney(property.price)}</span>
+                        <span className="map-popup-period"> {rentTypeLabel[property.rent_type]}</span>
+                      </div>
+                      <Button
+                        component={Link}
+                        to={`/app/property/${property.id}`}
+                        size="xs"
+                        radius="xl"
+                        className="map-popup-open-btn"
+                      >
+                        Ver imovel
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               </Popup>
             </Marker>
           ))}

@@ -14,7 +14,7 @@ import '@mantine/notifications/styles.css';
 
 ReactDOM.createRoot(document.getElementById('admin-root')!).render(
   <React.StrictMode>
-    <MantineProvider theme={appTheme} defaultColorScheme="dark">
+    <MantineProvider theme={appTheme} defaultColorScheme="light">
       <Notifications position="top-right" />
       {envIssue ? <ErrorScreen title="Configuracao invalida" message={envIssue} /> : <AdminPage />}
     </MantineProvider>

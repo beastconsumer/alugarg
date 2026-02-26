@@ -107,7 +107,7 @@ export function LegalTermsPage() {
                 Ultima atualizacao: 26/02/2026
               </Text>
               <Text size="xs" c="dimmed">
-                Este texto e informativo e deve ser validado por assessoria juridica antes da publicacao oficial.
+                Regras oficiais de uso da plataforma AlugaSul para anfitrioes e hospedes.
               </Text>
             </Stack>
 

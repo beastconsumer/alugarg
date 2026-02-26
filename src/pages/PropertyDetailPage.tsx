@@ -376,7 +376,9 @@ export function PropertyDetailPage() {
   const ownerAvatarUrl = owner?.avatar_url?.trim() ?? '';
   const showOwnerAvatar = Boolean(ownerAvatarUrl) && !ownerAvatarError;
   const photosRaw = property.photos.length > 0 ? property.photos : ['/background.png'];
-  const photos = photosRaw.length >= 5 ? photosRaw : [...photosRaw, ...Array(5 - photosRaw.length).fill(photosRaw[0])];
+  const galleryMainPhoto = photosRaw[0] ?? '/background.png';
+  const sidePhotos = photosRaw.slice(1, 5);
+  const sidePhotoSlots = [...sidePhotos, ...Array(Math.max(0, 4 - sidePhotos.length)).fill('')];
   const stayRules = [
     { icon: Clock3, text: `Minimo de ${property.minimum_nights} noite(s)` },
     { icon: Clock3, text: `Check-in: ${property.check_in_time}` },
@@ -456,15 +458,18 @@ export function PropertyDetailPage() {
 
       <div className="detail-gallery-grid">
         <div className="detail-gallery-main">
-          <img src={photos[0]} alt={`${property.title} principal`} className="detail-gallery-image" />
+          <img src={galleryMainPhoto} alt={`${property.title} principal`} className="detail-gallery-image" />
         </div>
 
         <div className="detail-gallery-side">
-          {photos.slice(1, 5).map((photo, index) => (
-            <div key={`${photo}-${index}`} className="detail-gallery-thumb">
-              <img src={photo} alt={`${property.title} ${index + 2}`} className="detail-gallery-image" />
-
-              {index === 3 ? (
+          {sidePhotoSlots.map((photo, index) => (
+            <div key={`side-photo-${index}`} className="detail-gallery-thumb">
+              {photo ? (
+                <img src={photo} alt={`${property.title} ${index + 2}`} className="detail-gallery-image" />
+              ) : (
+                <div className="detail-gallery-placeholder" />
+              )}
+              {index === 3 && photosRaw.length > 4 ? (
                 <Button
                   className="detail-gallery-show-all"
                   size="xs"

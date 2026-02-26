@@ -239,6 +239,7 @@ create table if not exists public.properties (
   description text not null,
   price integer not null,
   rent_type text not null,
+  rent_types text[] not null default '{}',
   bedrooms integer not null,
   bathrooms integer not null,
   garage_spots integer not null default 0,
@@ -268,6 +269,7 @@ create table if not exists public.properties (
 
 alter table public.properties add column if not exists garage_spots integer not null default 0;
 alter table public.properties add column if not exists guests_capacity integer not null default 1;
+alter table public.properties add column if not exists rent_types text[] not null default '{}';
 alter table public.properties add column if not exists suites integer not null default 0;
 alter table public.properties add column if not exists area_m2 integer not null default 0;
 alter table public.properties add column if not exists furnished boolean not null default false;
@@ -280,6 +282,14 @@ alter table public.properties add column if not exists check_out_time text not n
 alter table public.properties add column if not exists minimum_nights integer not null default 1;
 alter table public.properties add column if not exists cleaning_fee integer not null default 0;
 alter table public.properties add column if not exists security_deposit integer not null default 0;
+
+update public.properties
+set rent_types = case
+  when array_length(rent_types, 1) is null then array[rent_type]
+  when array_length(rent_types, 1) = 0 then array[rent_type]
+  else rent_types
+end
+where rent_type is not null;
 
 create index if not exists properties_status_created_at_idx on public.properties (status, created_at desc);
 create index if not exists properties_owner_created_at_idx on public.properties (owner_id, created_at desc);
@@ -800,6 +810,58 @@ for all
 using (public.is_admin())
 with check (public.is_admin());
 
+-- Support tickets (opened by user profile)
+create table if not exists public.support_tickets (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null,
+  category text not null default 'geral',
+  subject text not null default '',
+  message text not null default '',
+  status text not null default 'open',
+  admin_note text not null default '',
+  assigned_admin_id uuid,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  resolved_at timestamptz
+);
+
+create index if not exists support_tickets_user_created_idx
+  on public.support_tickets (user_id, created_at desc);
+create index if not exists support_tickets_status_created_idx
+  on public.support_tickets (status, created_at desc);
+
+alter table public.support_tickets enable row level security;
+
+drop policy if exists "Users open own support tickets" on public.support_tickets;
+drop policy if exists "Users read own support tickets" on public.support_tickets;
+drop policy if exists "Admins manage support tickets" on public.support_tickets;
+
+create policy "Users open own support tickets"
+on public.support_tickets
+for insert
+with check (auth.uid() = user_id and not public.is_user_blocked(auth.uid()));
+
+create policy "Users read own support tickets"
+on public.support_tickets
+for select
+using (auth.uid() = user_id);
+
+create policy "Admins manage support tickets"
+on public.support_tickets
+for all
+using (public.is_admin())
+with check (public.is_admin());
+
+do $$
+begin
+  begin
+    alter publication supabase_realtime add table public.support_tickets;
+  exception
+    when duplicate_object then null;
+  end;
+end;
+$$;
+
 -- Extra write guard: blocked users cannot mutate core business tables.
 create or replace function public.blocked_user_write_guard()
 returns trigger
@@ -853,8 +915,26 @@ on public.owner_reviews
 for each row
 execute function public.blocked_user_write_guard();
 
+drop trigger if exists trg_guard_blocked_user_support_tickets on public.support_tickets;
+create trigger trg_guard_blocked_user_support_tickets
+before insert or update
+on public.support_tickets
+for each row
+execute function public.blocked_user_write_guard();
+
 -- Storage policies (bucket: property-images)
--- Create the bucket manually in Supabase Storage as PUBLIC.
+do $$
+begin
+  begin
+    insert into storage.buckets (id, name, public)
+    values ('property-images', 'property-images', true)
+    on conflict (id) do update set public = excluded.public;
+  exception
+    when undefined_table then null;
+  end;
+end;
+$$;
+
 drop policy if exists "Public read property images" on storage.objects;
 drop policy if exists "Users upload to own folder" on storage.objects;
 drop policy if exists "Users update own files" on storage.objects;
@@ -890,7 +970,18 @@ using (
 );
 
 -- Storage policies (bucket: host-documents)
--- Create the bucket manually in Supabase Storage as PRIVATE.
+do $$
+begin
+  begin
+    insert into storage.buckets (id, name, public)
+    values ('host-documents', 'host-documents', false)
+    on conflict (id) do update set public = excluded.public;
+  exception
+    when undefined_table then null;
+  end;
+end;
+$$;
+
 drop policy if exists "Users read own host documents" on storage.objects;
 drop policy if exists "Users upload own host documents" on storage.objects;
 drop policy if exists "Users update own host documents" on storage.objects;

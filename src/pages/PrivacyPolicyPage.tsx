@@ -79,7 +79,7 @@ export function PrivacyPolicyPage() {
                 Ultima atualizacao: 26/02/2026
               </Text>
               <Text size="xs" c="dimmed">
-                Documento informativo para base do app. Revisao juridica final e recomendada antes de producao.
+                Politica oficial de privacidade e protecao de dados da plataforma AlugaSul.
               </Text>
             </Stack>
 

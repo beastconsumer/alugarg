@@ -1,6 +1,7 @@
-import { Badge, Card, Group, Image, Stack, Text, ThemeIcon } from '@mantine/core';
+import { useState } from 'react';
+import { Badge, Card, Group, Image, Stack, Text } from '@mantine/core';
 import { motion } from 'framer-motion';
-import { ArrowUpRight, Heart, Star } from 'lucide-react';
+import { Heart, Star } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { formatMoney } from '../lib/format';
 import { Property } from '../lib/types';
@@ -20,6 +21,8 @@ const getPriceContext = (rentType: Property['rent_type']): string => {
 export function PropertyCard({ property }: { property: Property }) {
   const cover = property.photos[0] || '/background.png';
   const rating = getRating(property.id);
+  const [saved, setSaved] = useState(false);
+  const [imgSrc, setImgSrc] = useState(cover);
 
   return (
     <motion.div
@@ -31,20 +34,32 @@ export function PropertyCard({ property }: { property: Property }) {
     >
       <Card component={Link} to={`/app/property/${property.id}`} withBorder radius="xl" p={0} className="home-listing-card">
         <div className="home-listing-image-wrap">
-          <Image src={cover} alt={property.title} className="home-listing-image" />
+          <Image
+            src={imgSrc}
+            alt={property.title}
+            className="home-listing-image"
+            onError={() => setImgSrc('/background.png')}
+          />
           <Group className="home-listing-overlay-top" justify="space-between" wrap="nowrap">
-            <Badge radius="xl" variant="filled" color="dark">
+            <Badge
+              radius="xl"
+              variant="filled"
+              color={property.verified ? 'brandNavy' : 'gray'}
+            >
               {property.verified ? 'Preferido dos hospedes' : 'Nova opcao'}
             </Badge>
-            <ThemeIcon
-              size={30}
-              radius="xl"
-              color="dark"
-              variant="gradient"
-              gradient={{ from: '#283248', to: '#111827', deg: 135 }}
+            <button
+              type="button"
+              aria-label={saved ? 'Remover dos salvos' : 'Salvar imovel'}
+              className={`property-heart-btn${saved ? ' saved' : ''}`}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setSaved((prev) => !prev);
+              }}
             >
-              <Heart size={14} />
-            </ThemeIcon>
+              <Heart size={14} color="white" fill={saved ? 'white' : 'none'} />
+            </button>
           </Group>
         </div>
 
@@ -58,15 +73,15 @@ export function PropertyCard({ property }: { property: Property }) {
           </Text>
 
           <Group justify="space-between" align="center" wrap="nowrap">
-            <Text size="sm" fw={700}>
-              {formatMoney(property.price)} {getPriceContext(property.rent_type)}
+            <Text size="sm" fw={800} c="dark">
+              {formatMoney(property.price)}{' '}
+              <Text span fw={400} c="dimmed" size="xs">{getPriceContext(property.rent_type)}</Text>
             </Text>
-            <Group gap={3} wrap="nowrap">
-              <Star size={13} fill="currentColor" />
-              <Text size="sm" fw={600}>
+            <Group gap={3} wrap="nowrap" style={{ color: '#1f5ed6' }}>
+              <Star size={12} fill="currentColor" />
+              <Text size="sm" fw={700}>
                 {rating}
               </Text>
-              <ArrowUpRight size={13} />
             </Group>
           </Group>
         </Stack>
